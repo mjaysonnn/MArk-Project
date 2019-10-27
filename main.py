@@ -31,16 +31,23 @@ def copy_keys(args, keys):
             dst_dict[key] = src_dict[key]
     return dst_dict
 
+"""
+port -> just port as we know
+
+need_updater -> update on-demand price, spot price
+
+signal -> 0 start application, 1 -> initial settings, 2 -> kill
+"""
 def main():
     args = get_args()
     params = copy_keys(args, ['port', 'need_updater', 'signal', 'tag'])
     if params['need_updater']:
-        multiprocessing.Process(target=prize_request.update_prize).start()
-    
+        multiprocessing.Process(target=prize_request.update_prize).start()  ## update price for demand and spot
+
     if params['signal'] == 0:
-        frontend.main(params['port'], params['tag'])
+        frontend.main(params['port'], params['tag']) #frontend
     elif params['signal'] == 1:
-        ins_source.initial_ins('mx', params['tag'])
+        ins_source.initial_ins('mx', params['tag'])  # starting initial settings
     elif params['signal'] == 2:
         ins_source.kill_all_ins('mx')
     elif params['signal'] == 3:

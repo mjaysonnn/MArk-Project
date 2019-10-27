@@ -25,3 +25,6 @@ get_log_dir_name() {
 
     echo ${PAST_LOGS}/${NAME}${INDEX}
 }
+
+
+# This looks like file containing logs

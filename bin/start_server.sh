@@ -28,7 +28,7 @@ start_redis() {
 }
 
 flush_redis() {
-    redis-cli flushall
+    redis-cli flushall # To delete all keys from all Redis databases, use the FLUSHALL command
 }
 
 start_mongodb() {
@@ -150,7 +150,7 @@ if [[ "$#" == 0 ]]; then
     echo "Usage: $0 start|stop|restart|clean"
     exit 1
 else
-    if [[ "$#" == 2 ]]; then  
+    if [[ "$#" == 2 ]]; then
         TAG=$2
     fi
     case $1 in

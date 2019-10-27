@@ -5,8 +5,8 @@ import logging
 import threading
 import time
 
-from sanic import Sanic
-from sanic.response import json
+from sanic import Sanic # Sanic is a Python 3.6+ web server and web framework that’s written to go fast
+from sanic.response import json # Receive json
 
 from . import utils
 from . import query_processor
@@ -22,10 +22,10 @@ logging.basicConfig(
 
 app = Sanic(__name__)
 processor = query_processor.QueryProcessor()
-sch = scheduler.Scheduler()
+sch = scheduler.Scheduler() # a general purpose event scheduler
 
 
-@app.route('/predict/<model_name>',  methods=['POST'])
+@app.route('/predict/<model_name>',  methods=['POST']) #decorator
 async def predict(request, model_name):
     if request.method == 'POST':
         receive_time = utils.now()
@@ -46,11 +46,11 @@ async def predict(request, model_name):
         else:
             scheduler.Scheduler.failed_rate = scheduler.Scheduler.failed_rate * 0.999
 
-        if sch.failed_rate > SLA_BOUND:
+        if sch.failed_rate > SLA_BOUND:  ## SLA mentioned in proposal
             sch.launch_standby('c5.xlarge', 1, model_name)
             scheduler.Scheduler.failed_rate = 0.0
 
-        
+
         logging.info(f'Model: {model_name}; typ: {typ}; handel_time: {handel_time}; failed_rate: {scheduler.Scheduler.failed_rate}')
         return json({
             'res' : res,
