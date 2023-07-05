@@ -44,12 +44,14 @@ if sys.platform.startswith('win'):
         # Python < 3.3
         import distutils.spawn
         which = distutils.spawn.find_executable
-    for binary in ('gswin32c', 'gswin64c', 'gs'):
-        if which(binary) is not None:
-            gs_windows_binary = binary
-            break
-    else:
-        gs_windows_binary = False
+    gs_windows_binary = next(
+        (
+            binary
+            for binary in ('gswin32c', 'gswin64c', 'gs')
+            if which(binary) is not None
+        ),
+        False,
+    )
 
 
 def has_ghostscript():
@@ -98,10 +100,7 @@ def Ghostscript(tile, size, fp, scale=1):
         os.close(in_fd)
         infile = infile_temp
 
-        # ignore length and offset!
-        # ghostscript can read it
-        # copy whole file to read in ghostscript
-        with open(infile_temp, 'wb') as f:
+        with open(infile, 'wb') as f:
             # fetch length of fp
             fp.seek(0, 2)
             fsize = fp.tell()
@@ -117,20 +116,23 @@ def Ghostscript(tile, size, fp, scale=1):
                 f.write(s)
 
     # Build ghostscript command
-    command = ["gs",
-               "-q",                         # quiet mode
-               "-g%dx%d" % size,             # set output geometry (pixels)
-               "-r%fx%f" % res,              # set input DPI (dots per inch)
-               "-dBATCH",                    # exit after processing
-               "-dNOPAUSE",                  # don't pause between pages,
-               "-dSAFER",                    # safe mode
-               "-sDEVICE=ppmraw",            # ppm driver
-               "-sOutputFile=%s" % outfile,  # output file
-               "-c", "%d %d translate" % (-bbox[0], -bbox[1]),
-                                             # adjust for image origin
-               "-f", infile,                 # input file
-               "-c", "showpage",             # showpage (see: https://bugs.ghostscript.com/show_bug.cgi?id=698272)
-               ]
+    command = [
+        "gs",
+        "-q",
+        "-g%dx%d" % size,
+        "-r%fx%f" % res,
+        "-dBATCH",
+        "-dNOPAUSE",
+        "-dSAFER",
+        "-sDEVICE=ppmraw",
+        f"-sOutputFile={outfile}",
+        "-c",
+        "%d %d translate" % (-bbox[0], -bbox[1]),
+        "-f",
+        infile,
+        "-c",
+        "showpage",
+    ]
 
     if gs_windows_binary is not None:
         if not gs_windows_binary:
@@ -255,23 +257,17 @@ class EpsImageFile(ImageFile.ImageFile):
                         except:
                             pass
 
-                else:
-                    m = field.match(s)
-                    if m:
-                        k = m.group(1)
+                elif m := field.match(s):
+                    k = m.group(1)
 
-                        if k == "EndComments":
-                            break
-                        if k[:8] == "PS-Adobe":
-                            self.info[k[:8]] = k[9:]
-                        else:
-                            self.info[k] = ""
-                    elif s[0] == '%':
-                        # handle non-DSC Postscript comments that some
-                        # tools mistakenly put in the Comments section
-                        pass
+                    if k == "EndComments":
+                        break
+                    if k[:8] == "PS-Adobe":
+                        self.info[k[:8]] = k[9:]
                     else:
-                        raise IOError("bad EPS header")
+                        self.info[k] = ""
+                elif s[0] != '%':
+                    raise IOError("bad EPS header")
 
             s_raw = fp.readline()
             s = s_raw.strip('\r\n')
@@ -317,7 +313,7 @@ class EpsImageFile(ImageFile.ImageFile):
             fp.seek(0, 2)
             length = fp.tell()
             offset = 0
-        elif i32(s[0:4]) == 0xC6D3D0C5:
+        elif i32(s[:4]) == 0xC6D3D0C5:
             # FIX for: Some EPS file not handled correctly / issue #302
             # EPS can contain binary data
             # or start directly with latin coding

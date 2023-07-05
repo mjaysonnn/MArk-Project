@@ -10,8 +10,8 @@ modules = {
 
 
 def check_module(feature):
-    if not (feature in modules):
-        raise ValueError("Unknown module %s" % feature)
+    if feature not in modules:
+        raise ValueError(f"Unknown module {feature}")
 
     module = modules[feature]
 
@@ -36,11 +36,11 @@ codecs = {
 
 def check_codec(feature):
     if feature not in codecs:
-        raise ValueError("Unknown codec %s" % feature)
+        raise ValueError(f"Unknown codec {feature}")
 
     codec = codecs[feature]
 
-    return codec + "_encoder" in dir(Image.core)
+    return f"{codec}_encoder" in dir(Image.core)
 
 
 def get_supported_codecs():
@@ -57,7 +57,7 @@ features = {
 
 def check_feature(feature):
     if feature not in features:
-        raise ValueError("Unknown feature %s" % feature)
+        raise ValueError(f"Unknown feature {feature}")
 
     module, flag = features[feature]
 

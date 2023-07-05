@@ -109,10 +109,10 @@ def MakeClass(descriptor):
   if descriptor in MESSAGE_CLASS_CACHE:
     return MESSAGE_CLASS_CACHE[descriptor]
 
-  attributes = {}
-  for name, nested_type in descriptor.nested_types_by_name.items():
-    attributes[name] = MakeClass(nested_type)
-
+  attributes = {
+      name: MakeClass(nested_type)
+      for name, nested_type in descriptor.nested_types_by_name.items()
+  }
   attributes[GeneratedProtocolMessageType._DESCRIPTOR_KEY] = descriptor
 
   result = GeneratedProtocolMessageType(

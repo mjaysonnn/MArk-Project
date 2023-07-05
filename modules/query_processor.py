@@ -55,9 +55,8 @@ class QueryProcessor():
             info = await self.query_queue.get()
             name = info[0][1]
             fu, times, data = [i[0] for i in info], [i[2] for i in info], [i[3] for i in info]
-            
-            alloc_info = ins_source.get_ins_alloc(name, self.balancer)
-            if alloc_info:
+
+            if alloc_info := ins_source.get_ins_alloc(name, self.balancer):
                 ip, typ = alloc_info[0], alloc_info[1]
                 if typ.startswith('p2'):
                     other_info = await self.query_queue.get(HANDLE_SIZE_P2 - 1)
@@ -96,15 +95,6 @@ class QueryProcessor():
             else:
                 logging.info(f'Request rejected. ip: {ip}; status: {resp.status}')
                 return ([ r for _ in data ], req_typ)
-                async with self.session.get(mdl_source.get_lambda_req()) as res_lam:
-                    if res_lam.status == 200:
-                        r = await res_lam.text()
-                        req_typ = [REQ_LAMBDA_GPU for _ in data] if is_gpu else [REQ_LAMBDA_CPU for _ in data]
-                        return ([ r for _ in data ], req_typ)
-                    else:
-                        logging.info(f'Lambda rejected. status: {res_lam.status}')
-                        req_typ = [REQ_FAIL_GPU for _ in data] if is_gpu else [REQ_FAIL_CPU for _ in data]
-                        return ([ f'Error code : {res_lam.status}' for _ in data ], req_typ)
 
 class QueryQuene():
     def __init__(self):

@@ -53,9 +53,7 @@ class GifImageFile(ImageFile.ImageFile):
 
     def data(self):
         s = self.fp.read(1)
-        if s and i8(s):
-            return self.fp.read(i8(s))
-        return None
+        return self.fp.read(i8(s)) if s and i8(s) else None
 
     def _open(self):
 
@@ -102,9 +100,7 @@ class GifImageFile(ImageFile.ImageFile):
     @property
     def is_animated(self):
         if self._is_animated is None:
-            if self._n_frames is not None:
-                self._is_animated = self._n_frames != 1
-            else:
+            if self._n_frames is None:
                 current = self.tell()
 
                 try:
@@ -114,6 +110,8 @@ class GifImageFile(ImageFile.ImageFile):
                     self._is_animated = False
 
                 self.seek(current)
+            else:
+                self._is_animated = self._n_frames != 1
         return self._is_animated
 
     def seek(self, frame):
@@ -133,18 +131,15 @@ class GifImageFile(ImageFile.ImageFile):
     def _seek(self, frame):
 
         if frame == 0:
-            # rewind
-            self.__offset = 0
             self.dispose = None
             self.dispose_extent = [0, 0, 0, 0]  # x0, y0, x1, y1
             self.__frame = -1
+            self.__offset = 0
             self.__fp.seek(self.__rewind)
             self._prev_im = None
             self.disposal_method = 0
-        else:
-            # ensure that the previous frame was loaded
-            if not self.im:
-                self.load()
+        elif not self.im:
+            self.load()
 
         if frame != self.__frame + 1:
             raise ValueError("cannot seek to frame %d" % frame)
@@ -189,8 +184,7 @@ class GifImageFile(ImageFile.ImageFile):
 
                     # disposal method - find the value of bits 4 - 6
                     dispose_bits = 0b00011100 & flags
-                    dispose_bits = dispose_bits >> 2
-                    if dispose_bits:
+                    if dispose_bits := dispose_bits >> 2:
                         # only set the dispose if it is not
                         # unspecified. I'm not sure if this is
                         # correct, but it seems to prevent the last
@@ -220,7 +214,7 @@ class GifImageFile(ImageFile.ImageFile):
                 s = self.fp.read(9)
 
                 # extent
-                x0, y0 = i16(s[0:]), i16(s[2:])
+                x0, y0 = i16(s[:]), i16(s[2:])
                 x1, y1 = x0 + i16(s[4:]), y0 + i16(s[6:])
                 self.dispose_extent = x0, y0, x1, y1
                 flags = i8(s[8])
@@ -230,7 +224,7 @@ class GifImageFile(ImageFile.ImageFile):
                 if flags & 128:
                     bits = (flags & 7) + 1
                     self.palette =\
-                        ImagePalette.raw("RGB", self.fp.read(3 << bits))
+                            ImagePalette.raw("RGB", self.fp.read(3 << bits))
 
                 # image data
                 bits = i8(self.fp.read(1))
@@ -241,10 +235,6 @@ class GifImageFile(ImageFile.ImageFile):
                              (bits, interlace))]
                 break
 
-            else:
-                pass
-                # raise IOError, "illegal GIF tag `%x`" % i8(s)
-
         try:
             if self.disposal_method < 2:
                 # do not dispose or none specified
@@ -253,10 +243,8 @@ class GifImageFile(ImageFile.ImageFile):
                 # replace with background colour
                 self.dispose = Image.core.fill("P", self.size,
                                                self.info["background"])
-            else:
-                # replace with previous contents
-                if self.im:
-                    self.dispose = self.im.copy()
+            elif self.im:
+                self.dispose = self.im.copy()
 
             # only dispose the extent in this frame
             if self.dispose:
@@ -320,13 +308,10 @@ def _normalize_mode(im, initial_call=False):
         im.load()
         return im
     if Image.getmodebase(im.mode) == "RGB":
-        if initial_call:
-            palette_size = 256
-            if im.palette:
-                palette_size = len(im.palette.getdata()[1]) // 3
-            return im.convert("P", palette=Image.ADAPTIVE, colors=palette_size)
-        else:
+        if not initial_call:
             return im.convert("P")
+        palette_size = len(im.palette.getdata()[1]) // 3 if im.palette else 256
+        return im.convert("P", palette=Image.ADAPTIVE, colors=palette_size)
     return im.convert("L")
 
 
@@ -380,7 +365,7 @@ def _write_single_frame(im, fp, palette):
     # local image header
     flags = 0
     if get_interlace(im):
-        flags = flags | 64
+        flags |= 64
     _write_local_header(fp, im, (0, 0), flags)
 
     im_out.encoderconfig = (8, get_interlace(im))
@@ -590,12 +575,10 @@ def _save_netpbm(im, fp, filename):
             # Allow ppmquant to receive SIGPIPE if ppmtogif exits
             quant_proc.stdout.close()
 
-            retcode = quant_proc.wait()
-            if retcode:
+            if retcode := quant_proc.wait():
                 raise CalledProcessError(retcode, quant_cmd)
 
-            retcode = togif_proc.wait()
-            if retcode:
+            if retcode := togif_proc.wait():
                 raise CalledProcessError(retcode, togif_cmd)
 
     try:
@@ -633,12 +616,7 @@ def _get_optimize(im, info):
         # create the new palette if not every color is used
         optimise = _FORCE_OPTIMIZE or im.mode == 'L'
         if optimise or im.width * im.height < 512 * 512:
-            # check which colors are used
-            used_palette_colors = []
-            for i, count in enumerate(im.histogram()):
-                if count:
-                    used_palette_colors.append(i)
-
+            used_palette_colors = [i for i, count in enumerate(im.histogram()) if count]
             if optimise or (len(used_palette_colors) <= 128 and
                max(used_palette_colors) > len(used_palette_colors)):
                 return used_palette_colors
@@ -648,8 +626,7 @@ def _get_color_table_size(palette_bytes):
     # calculate the palette size for the header
     import math
     color_table_size = int(math.ceil(math.log(len(palette_bytes)//3, 2)))-1
-    if color_table_size < 0:
-        color_table_size = 0
+    color_table_size = max(color_table_size, 0)
     return color_table_size
 
 

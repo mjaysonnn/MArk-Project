@@ -179,20 +179,14 @@ class _Printer(object):
 
     try:
       for field, value in fields:
-        if self.preserving_proto_field_name:
-          name = field.name
-        else:
-          name = field.json_name
+        name = field.name if self.preserving_proto_field_name else field.json_name
         if _IsMapEntry(field):
           # Convert a map field.
           v_field = field.message_type.fields_by_name['value']
           js_map = {}
           for key in value:
             if isinstance(key, bool):
-              if key:
-                recorded_key = 'true'
-              else:
-                recorded_key = 'false'
+              recorded_key = 'true' if key else 'false'
             else:
               recorded_key = key
             js_map[recorded_key] = self._FieldToJsonObject(
@@ -208,7 +202,7 @@ class _Printer(object):
               f.type == descriptor.FieldDescriptor.TYPE_MESSAGE and
               f.label == descriptor.FieldDescriptor.LABEL_OPTIONAL):
             f = f.message_type
-          name = '[%s.%s]' % (f.full_name, name)
+          name = f'[{f.full_name}.{name}]'
           js[name] = self._FieldToJsonObject(field, value)
         else:
           js[name] = self._FieldToJsonObject(field, value)
@@ -222,10 +216,7 @@ class _Printer(object):
                field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_MESSAGE) or
               field.containing_oneof):
             continue
-          if self.preserving_proto_field_name:
-            name = field.name
-          else:
-            name = field.json_name
+          name = field.name if self.preserving_proto_field_name else field.json_name
           if name in js:
             # Skip the field which has been serailized already.
             continue
@@ -265,10 +256,7 @@ class _Printer(object):
       return str(value)
     elif field.cpp_type in _FLOAT_TYPES:
       if math.isinf(value):
-        if value < 0.0:
-          return _NEG_INFINITY
-        else:
-          return _INFINITY
+        return _NEG_INFINITY if value < 0.0 else _INFINITY
       if math.isnan(value):
         return _NAN
     return value
@@ -324,10 +312,7 @@ class _Printer(object):
   def _StructMessageToJsonObject(self, message):
     """Converts Struct message according to Proto3 JSON Specification."""
     fields = message.fields
-    ret = {}
-    for key in fields:
-      ret[key] = self._ValueMessageToJsonObject(fields[key])
-    return ret
+    return {key: self._ValueMessageToJsonObject(fields[key]) for key in fields}
 
   def _WrapperMessageToJsonObject(self, message):
     return self._FieldToJsonObject(
@@ -444,8 +429,7 @@ class _Parser(object):
     """
     names = []
     message_descriptor = message.DESCRIPTOR
-    fields_by_json_name = dict((f.json_name, f)
-                               for f in message_descriptor.fields)
+    fields_by_json_name = {f.json_name: f for f in message_descriptor.fields}
     for name in js:
       try:
         field = fields_by_json_name.get(name, None)
@@ -533,9 +517,7 @@ class _Parser(object):
           raise ParseError('Failed to parse {0} field: {1}'.format(name, e))
         else:
           raise ParseError(str(e))
-      except ValueError as e:
-        raise ParseError('Failed to parse {0} field: {1}.'.format(name, e))
-      except TypeError as e:
+      except (ValueError, TypeError) as e:
         raise ParseError('Failed to parse {0} field: {1}.'.format(name, e))
 
   def _ConvertAnyMessage(self, value, message):
@@ -658,12 +640,11 @@ def _ConvertScalarFieldValue(value, field, require_str=False):
   elif field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_STRING:
     if field.type == descriptor.FieldDescriptor.TYPE_BYTES:
       return base64.b64decode(value)
-    else:
-      # Checking for unpaired surrogates appears to be unreliable,
-      # depending on the specific Python version, so we check manually.
-      if _UNPAIRED_SURROGATE_PATTERN.search(value):
-        raise ParseError('Unpaired surrogate')
-      return value
+    # Checking for unpaired surrogates appears to be unreliable,
+    # depending on the specific Python version, so we check manually.
+    if _UNPAIRED_SURROGATE_PATTERN.search(value):
+      raise ParseError('Unpaired surrogate')
+    return value
   elif field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_ENUM:
     # Convert an enum value.
     enum_value = field.enum_type.values_by_name.get(value, None)
@@ -674,9 +655,9 @@ def _ConvertScalarFieldValue(value, field, require_str=False):
       except ValueError:
         raise ParseError('Invalid enum value {0} for enum type {1}.'.format(
             value, field.enum_type.full_name))
-      if enum_value is None:
-        raise ParseError('Invalid enum value {0} for enum type {1}.'.format(
-            value, field.enum_type.full_name))
+    if enum_value is None:
+      raise ParseError('Invalid enum value {0} for enum type {1}.'.format(
+          value, field.enum_type.full_name))
     return enum_value.number
 
 

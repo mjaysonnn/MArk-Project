@@ -100,11 +100,7 @@ class FpxImageFile(ImageFile.ImageFile):
 
         s = prop[0x2000002 | id]
 
-        colors = []
-        for i in range(i32(s, 4)):
-            # note: for now, we ignore the "uncalibrated" flag
-            colors.append(i32(s, 8+i*4) & 0x7fffffff)
-
+        colors = [i32(s, 8+i*4) & 0x7fffffff for i in range(i32(s, 4))]
         self.mode, self.rawmode = MODES[tuple(colors)]
 
         # load JPEG tables, if any

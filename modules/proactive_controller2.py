@@ -29,10 +29,10 @@ class ProactiveController:
         self.interval = interval
 
     def calculateCapacity(self, current_instances):
-        totalCapa = 0
-        for i in range(len(current_instances)):
-            totalCapa += self.instance_info[i][0] * current_instances[i]
-        return totalCapa
+        return sum(
+            self.instance_info[i][0] * current_instances[i]
+            for i in range(len(current_instances))
+        )
 
     def findCheapest(self, t_span, residualForecasts, max_idx):
         cheapest_i = -1
@@ -41,10 +41,13 @@ class ProactiveController:
         for i in range(len(self.instance_info)):
             totalCost = self.instance_info[i][1] * t_span * self.interval + self.instance_info[i][2]
             iCapa = self.instance_info[i][0]
-            counted = 0
-            for j in range(t_span):
-                if residualForecasts[max_idx + j] > 0:
-                    counted += iCapa if (residualForecasts[max_idx + j] >= iCapa) else residualForecasts[max_idx + j]
+            counted = sum(
+                iCapa
+                if (residualForecasts[max_idx + j] >= iCapa)
+                else residualForecasts[max_idx + j]
+                for j in range(t_span)
+                if residualForecasts[max_idx + j] > 0
+            )
             cost_per_r = (totalCost * 1.0) / counted
             #print('i:'+str(i)+' total_cost:'+str(totalCost)+' i_capacity:'+str(iCapa)+' cost_p:'+str(cost_per_r))
             if lowest_cost >= cost_per_r > 0:
@@ -91,8 +94,10 @@ class ProactiveController:
         # print(current_instances)
         self.n_instance = len(instance_info)
         self.instance_info = [row[:] for row in instance_info]
-        for i in range(len(instance_info)):
-            self.instance_info.append([instance_info[i][0],instance_info[i][1], 0])
+        self.instance_info.extend(
+            [instance_info[i][0], instance_info[i][1], 0]
+            for i in range(len(instance_info))
+        )
         self.existing_limit = current_instances.copy()
         #print(self.existing_limit)
         self.instance_plan = [0] * len(self.instance_info)

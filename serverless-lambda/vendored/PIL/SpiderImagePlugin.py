@@ -44,10 +44,7 @@ import sys
 def isInt(f):
     try:
         i = int(f)
-        if f-i == 0:
-            return 1
-        else:
-            return 0
+        return 1 if f-i == 0 else 0
     except (ValueError, OverflowError):
         return 0
 
@@ -75,10 +72,7 @@ def isSpiderHeader(t):
     labbyt = int(h[22])   # total no. of bytes in header
     lenbyt = int(h[23])   # record length in bytes
     # print("labrec = %d, labbyt = %d, lenbyt = %d" % (labrec,labbyt,lenbyt))
-    if labbyt != (labrec * lenbyt):
-        return 0
-    # looks like a valid header
-    return labbyt
+    return 0 if labbyt != (labrec * lenbyt) else labbyt
 
 
 def isSpiderImage(filename):
@@ -144,10 +138,7 @@ class SpiderImageFile(ImageFile.ImageFile):
         else:
             raise SyntaxError("inconsistent stack header values")
 
-        if self.bigendian:
-            self.rawmode = "F;32BF"
-        else:
-            self.rawmode = "F;32F"
+        self.rawmode = "F;32BF" if self.bigendian else "F;32F"
         self.mode = "F"
 
         self.tile = [
@@ -165,10 +156,7 @@ class SpiderImageFile(ImageFile.ImageFile):
 
     # 1st image index is zero (although SPIDER imgnumber starts at 1)
     def tell(self):
-        if self.imgnumber < 1:
-            return 0
-        else:
-            return self.imgnumber - 1
+        return 0 if self.imgnumber < 1 else self.imgnumber - 1
 
     def seek(self, frame):
         if self.istack == 0:
@@ -183,9 +171,7 @@ class SpiderImageFile(ImageFile.ImageFile):
     # returns a byte image after rescaling to 0..255
     def convert2byte(self, depth=255):
         (minimum, maximum) = self.getextrema()
-        m = 1
-        if maximum != minimum:
-            m = depth / (maximum-minimum)
+        m = depth / (maximum-minimum) if maximum != minimum else 1
         b = -m * minimum
         return self.point(lambda i, m=m, b=b: i * m + b).convert("L")
 
@@ -207,13 +193,13 @@ def loadImageSeries(filelist=None):
     imglist = []
     for img in filelist:
         if not os.path.exists(img):
-            print("unable to find %s" % img)
+            print(f"unable to find {img}")
             continue
         try:
             im = Image.open(img).convert2byte()
         except:
             if not isSpiderImage(img):
-                print(img + " is not a Spider image file")
+                print(f"{img} is not a Spider image file")
             continue
         im.info['filename'] = img
         imglist.append(im)
@@ -230,11 +216,8 @@ def makeSpiderHeader(im):
     if 1024 % lenbyt != 0:
         labrec += 1
     labbyt = labrec * lenbyt
-    hdr = []
     nvalues = int(labbyt / 4)
-    for i in range(nvalues):
-        hdr.append(0.0)
-
+    hdr = [0.0 for _ in range(nvalues)]
     if len(hdr) < 23:
         return []
 
@@ -250,11 +233,7 @@ def makeSpiderHeader(im):
     # adjust for Fortran indexing
     hdr = hdr[1:]
     hdr.append(0.0)
-    # pack binary data into a string
-    hdrstr = []
-    for v in hdr:
-        hdrstr.append(struct.pack('f', v))
-    return hdrstr
+    return [struct.pack('f', v) for v in hdr]
 
 
 def _save(im, fp, filename):
@@ -296,10 +275,10 @@ if __name__ == "__main__":
         sys.exit()
 
     im = Image.open(filename)
-    print("image: " + str(im))
-    print("format: " + str(im.format))
-    print("size: " + str(im.size))
-    print("mode: " + str(im.mode))
+    print(f"image: {str(im)}")
+    print(f"format: {str(im.format)}")
+    print(f"size: {str(im.size)}")
+    print(f"mode: {str(im.mode)}")
     print("max, min: ", end=' ')
     print(im.getextrema())
 
@@ -309,6 +288,6 @@ if __name__ == "__main__":
         # perform some image operation
         im = im.transpose(Image.FLIP_LEFT_RIGHT)
         print(
-            "saving a flipped version of %s as %s " %
-            (os.path.basename(filename), outfile))
+            f"saving a flipped version of {os.path.basename(filename)} as {outfile} "
+        )
         im.save(outfile, SpiderImageFile.format)

@@ -32,7 +32,7 @@ def formatannotation(annotation, base_module=None):
     if isinstance(annotation, type):
         if annotation.__module__ in ('builtins', '__builtin__', base_module):
             return annotation.__name__
-        return annotation.__module__+'.'+annotation.__name__
+        return f'{annotation.__module__}.{annotation.__name__}'
     return repr(annotation)
 
 
@@ -63,27 +63,22 @@ def signature(obj):
         if obj.__self__ is None:
             # Unbound method - preserve as-is.
             return sig
-        else:
-            # Bound method. Eat self - if we can.
-            params = tuple(sig.parameters.values())
+        # Bound method. Eat self - if we can.
+        params = tuple(sig.parameters.values())
 
-            if not params or params[0].kind in (_VAR_KEYWORD, _KEYWORD_ONLY):
-                raise ValueError('invalid method signature')
+        if not params or params[0].kind in (_VAR_KEYWORD, _KEYWORD_ONLY):
+            raise ValueError('invalid method signature')
 
-            kind = params[0].kind
-            if kind in (_POSITIONAL_OR_KEYWORD, _POSITIONAL_ONLY):
-                # Drop first parameter:
-                # '(p1, p2[, ...])' -> '(p2[, ...])'
-                params = params[1:]
-            else:
-                if kind is not _VAR_POSITIONAL:
-                    # Unless we add a new parameter type we never
-                    # get here
-                    raise ValueError('invalid argument type')
-                # It's a var-positional parameter.
-                # Do nothing. '(*args[, ...])' -> '(*args[, ...])'
-
-            return sig.replace(parameters=params)
+        kind = params[0].kind
+        if kind in (_POSITIONAL_OR_KEYWORD, _POSITIONAL_ONLY):
+            # Drop first parameter:
+            # '(p1, p2[, ...])' -> '(p2[, ...])'
+            params = params[1:]
+        elif kind is not _VAR_POSITIONAL:
+            # Unless we add a new parameter type we never
+            # get here
+            raise ValueError('invalid argument type')
+        return sig.replace(parameters=params)
 
     try:
         sig = obj.__signature__
@@ -196,8 +191,8 @@ class _empty(object):
 
 
 class _ParameterKind(int):
-    def __new__(self, *args, **kwargs):
-        obj = int.__new__(self, *args)
+    def __new__(cls, *args, **kwargs):
+        obj = int.__new__(cls, *args)
         obj._name = kwargs['name']
         return obj
 
@@ -264,14 +259,12 @@ class Parameter(object):
             if kind != _POSITIONAL_ONLY:
                 raise ValueError("None is not a valid name for a "
                                  "non-positional-only parameter")
-            self._name = name
         else:
             name = str(name)
             if kind != _POSITIONAL_ONLY and not re.match(r'[a-z_]\w*$', name, re.I):
                 msg = '{0!r} is not a valid parameter name'.format(name)
                 raise ValueError(msg)
-            self._name = name
-
+        self._name = name
         self._partial_kwarg = _partial_kwarg
 
     @property
@@ -330,9 +323,9 @@ class Parameter(object):
             formatted = '{0}={1}'.format(formatted, repr(self._default))
 
         if kind == _VAR_POSITIONAL:
-            formatted = '*' + formatted
+            formatted = f'*{formatted}'
         elif kind == _VAR_KEYWORD:
-            formatted = '**' + formatted
+            formatted = f'**{formatted}'
 
         return formatted
 
@@ -417,10 +410,9 @@ class BoundArguments(object):
                 if (param.kind in (_VAR_KEYWORD, _KEYWORD_ONLY) or
                                                 param._partial_kwarg):
                     kwargs_started = True
-                else:
-                    if param_name not in self.arguments:
-                        kwargs_started = True
-                        continue
+                elif param_name not in self.arguments:
+                    kwargs_started = True
+                    continue
 
             if not kwargs_started:
                 continue
@@ -432,7 +424,7 @@ class BoundArguments(object):
             else:
                 if param.kind == _VAR_KEYWORD:
                     # **kwargs
-                    kwargs.update(arg)
+                    kwargs |= arg
                 else:
                     # plain keyword argument
                     kwargs[param_name] = arg
@@ -490,32 +482,31 @@ class Signature(object):
 
         if parameters is None:
             params = OrderedDict()
-        else:
-            if __validate_parameters__:
-                params = OrderedDict()
-                top_kind = _POSITIONAL_ONLY
+        elif __validate_parameters__:
+            params = OrderedDict()
+            top_kind = _POSITIONAL_ONLY
 
-                for idx, param in enumerate(parameters):
-                    kind = param.kind
-                    if kind < top_kind:
-                        msg = 'wrong parameter order: {0} before {1}'
-                        msg = msg.format(top_kind, param.kind)
-                        raise ValueError(msg)
-                    else:
-                        top_kind = kind
+            for idx, param in enumerate(parameters):
+                kind = param.kind
+                if kind < top_kind:
+                    msg = 'wrong parameter order: {0} before {1}'
+                    msg = msg.format(top_kind, param.kind)
+                    raise ValueError(msg)
+                else:
+                    top_kind = kind
 
-                    name = param.name
-                    if name is None:
-                        name = str(idx)
-                        param = param.replace(name=name)
+                name = param.name
+                if name is None:
+                    name = str(idx)
+                    param = param.replace(name=name)
 
-                    if name in params:
-                        msg = 'duplicate parameter name: {0!r}'.format(name)
-                        raise ValueError(msg)
+                if name in params:
+                    raise ValueError('duplicate parameter name: {0!r}'.format(name))
+                else:
                     params[name] = param
-            else:
-                params = OrderedDict(((param.name, param)
-                                                for param in parameters))
+        else:
+            params = OrderedDict(((param.name, param)
+                                            for param in parameters))
 
         self._parameters = params
         self._return_annotation = return_annotation
@@ -540,11 +531,7 @@ class Signature(object):
         defaults = func.__defaults__
         kwdefaults = getattr(func, '__kwdefaults__', None)
 
-        if defaults:
-            pos_default_count = len(defaults)
-        else:
-            pos_default_count = 0
-
+        pos_default_count = len(defaults) if defaults else 0
         parameters = []
 
         # Non-keyword-only parameters w/o defaults.
@@ -629,8 +616,9 @@ class Signature(object):
                     len(self.parameters) != len(other.parameters)):
             return False
 
-        other_positions = dict((param, idx)
-                           for idx, param in enumerate(other.parameters.keys()))
+        other_positions = {
+            param: idx for idx, param in enumerate(other.parameters.keys())
+        }
 
         for idx, (param_name, param) in enumerate(self.parameters.items()):
             if param.kind == _KEYWORD_ONLY:
@@ -784,12 +772,12 @@ class Signature(object):
 
         return self._bound_arguments_cls(self, arguments)
 
-    def bind(*args, **kwargs):
+    def bind(self, **kwargs):
         '''Get a BoundArguments object, that maps the passed `args`
         and `kwargs` to the function's signature.  Raises `TypeError`
         if the passed arguments can not be bound.
         '''
-        return args[0]._bind(args[1:], kwargs)
+        return self[0]._bind(self[1:], kwargs)
 
     def bind_partial(self, *args, **kwargs):
         '''Get a BoundArguments object, that partially maps the
@@ -801,7 +789,7 @@ class Signature(object):
     def __str__(self):
         result = []
         render_kw_only_separator = True
-        for idx, param in enumerate(self.parameters.values()):
+        for param in self.parameters.values():
             formatted = str(param)
 
             kind = param.kind

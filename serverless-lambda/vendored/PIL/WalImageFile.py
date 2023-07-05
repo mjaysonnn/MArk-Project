@@ -70,9 +70,8 @@ def open(filename):
 
     if hasattr(filename, "read"):
         return imopen(filename)
-    else:
-        with builtins.open(filename, "rb") as fp:
-            return imopen(fp)
+    with builtins.open(filename, "rb") as fp:
+        return imopen(fp)
 
 
 quake2palette = (

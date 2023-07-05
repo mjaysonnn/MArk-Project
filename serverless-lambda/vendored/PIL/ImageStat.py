@@ -30,10 +30,7 @@ class Stat(object):
 
     def __init__(self, image_or_list, mask=None):
         try:
-            if mask:
-                self.h = image_or_list.histogram(mask)
-            else:
-                self.h = image_or_list.histogram()
+            self.h = image_or_list.histogram(mask) if mask else image_or_list.histogram()
         except AttributeError:
             self.h = image_or_list  # assume it to be a histogram list
         if not isinstance(self.h, list):
@@ -45,7 +42,7 @@ class Stat(object):
         if id[:4] == "_get":
             raise AttributeError(id)
         # calculate missing attribute
-        v = getattr(self, "_get" + id)()
+        v = getattr(self, f"_get{id}")()
         setattr(self, id, v)
         return v
 
@@ -69,10 +66,10 @@ class Stat(object):
     def _getcount(self):
         "Get total number of pixels in each layer"
 
-        v = []
-        for i in range(0, len(self.h), 256):
-            v.append(functools.reduce(operator.add, self.h[i:i+256]))
-        return v
+        return [
+            functools.reduce(operator.add, self.h[i : i + 256])
+            for i in range(0, len(self.h), 256)
+        ]
 
     def _getsum(self):
         "Get sum of all pixels in each layer"
@@ -99,10 +96,7 @@ class Stat(object):
     def _getmean(self):
         "Get average pixel level for each layer"
 
-        v = []
-        for i in self.bands:
-            v.append(self.sum[i] / self.count[i])
-        return v
+        return [self.sum[i] / self.count[i] for i in self.bands]
 
     def _getmedian(self):
         "Get median pixel level for each layer"
@@ -122,10 +116,7 @@ class Stat(object):
     def _getrms(self):
         "Get RMS for each layer"
 
-        v = []
-        for i in self.bands:
-            v.append(math.sqrt(self.sum2[i] / self.count[i]))
-        return v
+        return [math.sqrt(self.sum2[i] / self.count[i]) for i in self.bands]
 
     def _getvar(self):
         "Get variance for each layer"
@@ -139,10 +130,7 @@ class Stat(object):
     def _getstddev(self):
         "Get standard deviation for each layer"
 
-        v = []
-        for i in self.bands:
-            v.append(math.sqrt(self.var[i]))
-        return v
+        return [math.sqrt(self.var[i]) for i in self.bands]
 
 
 Global = Stat  # compatibility

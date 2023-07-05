@@ -47,10 +47,14 @@ def show(image, title=None, **options):
     :param \**options: Additional viewer options.
     :returns: True if a suitable viewer was found, false otherwise.
     """
-    for viewer in _viewers:
-        if viewer.show(image, title=title, **options):
-            return 1
-    return 0
+    return next(
+        (
+            1
+            for viewer in _viewers
+            if viewer.show(image, title=title, **options)
+        ),
+        0,
+    )
 
 
 class Viewer(object):
@@ -61,14 +65,7 @@ class Viewer(object):
     def show(self, image, **options):
 
         # save temporary image to disk
-        if image.mode[:4] == "I;16":
-            # @PIL88 @PIL101
-            # "I;16" isn't an 'official' mode, but we still want to
-            # provide a simple way to show 16-bit images.
-            base = "L"
-            # FIXME: auto-contrast if max() > 255?
-        else:
-            base = Image.getmodebase(image.mode)
+        base = "L" if image.mode[:4] == "I;16" else Image.getmodebase(image.mode)
         if base != image.mode and image.mode != "1" and image.mode != "RGBA":
             image = image.convert(base)
 
@@ -124,9 +121,7 @@ elif sys.platform == "darwin":
             # on darwin open returns immediately resulting in the temp
             # file removal while app is opening
             command = "open -a /Applications/Preview.app"
-            command = "(%s %s; sleep 20; rm -f %s)&" % (command, quote(file),
-                                                        quote(file))
-            return command
+            return f"({command} {quote(file)}; sleep 20; rm -f {quote(file)})&"
 
     register(MacViewer)
 
@@ -150,8 +145,7 @@ else:
 
         def show_file(self, file, **options):
             command, executable = self.get_command_ex(file, **options)
-            command = "(%s %s; rm -f %s)&" % (command, quote(file),
-                                              quote(file))
+            command = f"({command} {quote(file)}; rm -f {quote(file)})&"
             os.system(command)
             return 1
 
@@ -179,7 +173,7 @@ else:
             # imagemagick's display command instead.
             command = executable = "xv"
             if title:
-                command += " -name %s" % quote(title)
+                command += f" -name {quote(title)}"
             return command, executable
 
     if which("xv"):

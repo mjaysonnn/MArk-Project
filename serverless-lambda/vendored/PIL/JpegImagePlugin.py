@@ -181,9 +181,7 @@ def SOF(self, marker):
         # fixup icc profile
         self.icclist.sort()  # sort by sequence number
         if i8(self.icclist[0][13]) == len(self.icclist):
-            profile = []
-            for p in self.icclist:
-                profile.append(p[14:])
+            profile = [p[14:] for p in self.icclist]
             icc_profile = b"".join(profile)
         else:
             icc_profile = None  # wrong number of fragments
@@ -290,7 +288,7 @@ MARKER = {
 
 
 def _accept(prefix):
-    return prefix[0:1] == b"\377"
+    return prefix[:1] == b"\377"
 
 
 ##
@@ -345,7 +343,7 @@ class JpegImageFile(ImageFile.ImageFile):
                     # self.__offset = self.fp.tell()
                     break
                 s = self.fp.read(1)
-            elif i == 0 or i == 0xFFFF:
+            elif i in [0, 0xFFFF]:
                 # padded marker or junk; move on
                 s = b"\xff"
             elif i == 0xFF00:  # Skip extraneous data (escaped 0xFF)
@@ -361,12 +359,7 @@ class JpegImageFile(ImageFile.ImageFile):
         """
         s = self.fp.read(read_bytes)
 
-        if not s and ImageFile.LOAD_TRUNCATED_IMAGES:
-            # Premature EOF.
-            # Pretend file is finished adding EOI marker
-            return b"\xFF\xD9"
-
-        return s
+        return b"\xFF\xD9" if not s and ImageFile.LOAD_TRUNCATED_IMAGES else s
 
     def draft(self, mode, size):
 
@@ -476,7 +469,7 @@ def _getexif(self):
     else:
         info = TiffImagePlugin.ImageFileDirectory_v1(head)
         info.load(file)
-        exif.update(_fixup_dict(info))
+        exif |= _fixup_dict(info)
     # get gpsinfo extension
     try:
         # exif field 0x8825 is an offset pointer to the location
@@ -525,7 +518,8 @@ def _getmp(self):
         rawmpentries = mp[0xB002]
         for entrynum in range(0, quant):
             unpackedentry = struct.unpack_from(
-                '{}LLLHH'.format(endianness), rawmpentries, entrynum * 16)
+                f'{endianness}LLLHH', rawmpentries, entrynum * 16
+            )
             labels = ('Attribute', 'Size', 'DataOffset', 'EntryNo1',
                       'EntryNo2')
             mpentry = dict(zip(labels, unpackedentry))
@@ -619,7 +613,7 @@ def _save(im, fp, filename):
     try:
         rawmode = RAWMODE[im.mode]
     except KeyError:
-        raise IOError("cannot write mode %s as JPEG" % im.mode)
+        raise IOError(f"cannot write mode {im.mode} as JPEG")
 
     info = im.encoderinfo
 

@@ -49,10 +49,7 @@ class LutBuilder(object):
 
     """
     def __init__(self, patterns=None, op_name=None):
-        if patterns is not None:
-            self.patterns = patterns
-        else:
-            self.patterns = []
+        self.patterns = patterns if patterns is not None else []
         self.lut = None
         if op_name is not None:
             known_patterns = {
@@ -69,7 +66,7 @@ class LutBuilder(object):
                          '4:(01. .1. ...)->1']
             }
             if op_name not in known_patterns:
-                raise Exception('Unknown pattern '+op_name+'!')
+                raise Exception(f'Unknown pattern {op_name}!')
 
             self.patterns = known_patterns[op_name]
 
@@ -100,24 +97,26 @@ class LutBuilder(object):
         # rotations
         if '4' in options:
             res = patterns[-1][1]
-            for i in range(4):
-                patterns.append(
-                    (self._string_permute(patterns[-1][0], [6, 3, 0,
-                                                            7, 4, 1,
-                                                            8, 5, 2]), res))
+            patterns.extend(
+                (
+                    self._string_permute(
+                        patterns[-1][0], [6, 3, 0, 7, 4, 1, 8, 5, 2]
+                    ),
+                    res,
+                )
+                for _ in range(4)
+            )
         # mirror
         if 'M' in options:
             n = len(patterns)
-            for pattern, res in patterns[0:n]:
-                patterns.append(
-                    (self._string_permute(pattern, [2, 1, 0,
-                                                    5, 4, 3,
-                                                    8, 7, 6]), res))
-
+            patterns.extend(
+                (self._string_permute(pattern, [2, 1, 0, 5, 4, 3, 8, 7, 6]), res)
+                for pattern, res in patterns[:n]
+            )
         # negate
         if 'N' in options:
             n = len(patterns)
-            for pattern, res in patterns[0:n]:
+            for pattern, res in patterns[:n]:
                 # Swap 0 and 1
                 pattern = (pattern
                            .replace('0', 'Z')
@@ -141,10 +140,10 @@ class LutBuilder(object):
             m = re.search(
                 r'(\w*):?\s*\((.+?)\)\s*->\s*(\d)', p.replace('\n', ''))
             if not m:
-                raise Exception('Syntax error in pattern "'+p+'"')
-            options = m.group(1)
-            pattern = m.group(2)
-            result = int(m.group(3))
+                raise Exception(f'Syntax error in pattern "{p}"')
+            options = m[1]
+            pattern = m[2]
+            result = int(m[3])
 
             # Get rid of spaces
             pattern = pattern.replace(' ', '').replace('\n', '')

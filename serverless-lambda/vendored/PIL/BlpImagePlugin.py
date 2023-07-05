@@ -296,7 +296,7 @@ class _BLPBaseDecoder(ImageFile.PyDecoder):
 
     def _read_palette(self):
         ret = []
-        for i in range(256):
+        for _ in range(256):
             try:
                 b, g, r, a = struct.unpack("<4B", self.fd.read(4))
             except struct.error:
@@ -330,23 +330,22 @@ class BLP1Decoder(_BLPBaseDecoder):
             self._decode_jpeg_stream()
 
         elif self._blp_compression == 1:
-            if self._blp_encoding in (4, 5):
-                data = bytearray()
-                palette = self._read_palette()
-                _data = BytesIO(self.fd.read(self._blp_lengths[0]))
-                while True:
-                    try:
-                        offset, = struct.unpack("<B", _data.read(1))
-                    except struct.error:
-                        break
-                    b, g, r, a = palette[offset]
-                    data.extend([r, g, b])
-
-                self.set_as_raw(bytes(data))
-            else:
+            if self._blp_encoding not in (4, 5):
                 raise BLPFormatError(
                     "Unsupported BLP encoding %r" % (self._blp_encoding)
                 )
+            data = bytearray()
+            palette = self._read_palette()
+            _data = BytesIO(self.fd.read(self._blp_lengths[0]))
+            while True:
+                try:
+                    offset, = struct.unpack("<B", _data.read(1))
+                except struct.error:
+                    break
+                b, g, r, a = palette[offset]
+                data.extend([r, g, b])
+
+            self.set_as_raw(bytes(data))
         else:
             raise BLPFormatError(
                 "Unsupported BLP compression %r" % (self._blp_encoding)
@@ -375,52 +374,51 @@ class BLP2Decoder(_BLPBaseDecoder):
         data = bytearray()
         self.fd.seek(self._blp_offsets[0])
 
-        if self._blp_compression == 1:
-            # Uncompressed or DirectX compression
-
-            if self._blp_encoding == BLP_ENCODING_UNCOMPRESSED:
-                _data = BytesIO(self.fd.read(self._blp_lengths[0]))
-                while True:
-                    try:
-                        offset, = struct.unpack("<B", _data.read(1))
-                    except struct.error:
-                        break
-                    b, g, r, a = palette[offset]
-                    data.extend((r, g, b))
-
-            elif self._blp_encoding == BLP_ENCODING_DXT:
-                if self._blp_alpha_encoding == BLP_ALPHA_ENCODING_DXT1:
-                    linesize = (self.size[0] + 3) // 4 * 8
-                    for yb in range((self.size[1] + 3) // 4):
-                        for d in decode_dxt1(
-                            self.fd.read(linesize),
-                            alpha=bool(self._blp_alpha_depth)
-                        ):
-                            data += d
-
-                elif self._blp_alpha_encoding == BLP_ALPHA_ENCODING_DXT3:
-                    linesize = (self.size[0] + 3) // 4 * 16
-                    for yb in range((self.size[1] + 3) // 4):
-                        for d in decode_dxt3(self.fd.read(linesize)):
-                            data += d
-
-                elif self._blp_alpha_encoding == BLP_ALPHA_ENCODING_DXT5:
-                    linesize = (self.size[0] + 3) // 4 * 16
-                    for yb in range((self.size[1] + 3) // 4):
-                        for d in decode_dxt5(self.fd.read(linesize)):
-                            data += d
-                else:
-                    raise BLPFormatError("Unsupported alpha encoding %r" % (
-                        self._blp_alpha_encoding
-                    ))
-            else:
-                raise BLPFormatError(
-                    "Unknown BLP encoding %r" % (self._blp_encoding)
-                )
-
-        else:
+        if self._blp_compression != 1:
             raise BLPFormatError(
                 "Unknown BLP compression %r" % (self._blp_compression)
+            )
+
+            # Uncompressed or DirectX compression
+
+        if self._blp_encoding == BLP_ENCODING_UNCOMPRESSED:
+            _data = BytesIO(self.fd.read(self._blp_lengths[0]))
+            while True:
+                try:
+                    offset, = struct.unpack("<B", _data.read(1))
+                except struct.error:
+                    break
+                b, g, r, a = palette[offset]
+                data.extend((r, g, b))
+
+        elif self._blp_encoding == BLP_ENCODING_DXT:
+            if self._blp_alpha_encoding == BLP_ALPHA_ENCODING_DXT1:
+                linesize = (self.size[0] + 3) // 4 * 8
+                for _ in range((self.size[1] + 3) // 4):
+                    for d in decode_dxt1(
+                        self.fd.read(linesize),
+                        alpha=bool(self._blp_alpha_depth)
+                    ):
+                        data += d
+
+            elif self._blp_alpha_encoding == BLP_ALPHA_ENCODING_DXT3:
+                linesize = (self.size[0] + 3) // 4 * 16
+                for _ in range((self.size[1] + 3) // 4):
+                    for d in decode_dxt3(self.fd.read(linesize)):
+                        data += d
+
+            elif self._blp_alpha_encoding == BLP_ALPHA_ENCODING_DXT5:
+                linesize = (self.size[0] + 3) // 4 * 16
+                for _ in range((self.size[1] + 3) // 4):
+                    for d in decode_dxt5(self.fd.read(linesize)):
+                        data += d
+            else:
+                raise BLPFormatError("Unsupported alpha encoding %r" % (
+                    self._blp_alpha_encoding
+                ))
+        else:
+            raise BLPFormatError(
+                "Unknown BLP encoding %r" % (self._blp_encoding)
             )
 
         self.set_as_raw(bytes(data))

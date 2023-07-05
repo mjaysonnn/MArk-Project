@@ -34,13 +34,11 @@ class Predictor:
         X = X.reshape(1, 1, len(X))
         forecast = self.model.predict(X, batch_size=1)
         # return an array
-        return [x for x in forecast[0, :]]
+        return list(forecast[0, :])
 
     def inverse_difference(self, last_ob, forecast):
-        inverted = list()
-        inverted.append(forecast[0] + last_ob)
-        for i in range(1, len(forecast)):
-            inverted.append(forecast[i] + inverted[i-1])
+        inverted = [forecast[0] + last_ob]
+        inverted.extend(forecast[i] + inverted[i-1] for i in range(1, len(forecast)))
         return inverted
 
     def inverse_transform(self, forecast, current_load):
@@ -49,8 +47,7 @@ class Predictor:
         # invert scaling
         inv_scale = self.scaler.inverse_transform(forecast)
         inv_scale = inv_scale[0, :]
-        inv_diff = self.inverse_difference(current_load, inv_scale)
-        return inv_diff
+        return self.inverse_difference(current_load, inv_scale)
 
     def predict(self, current_load):
         X = [[(current_load - self.last_step)]]
@@ -59,5 +56,4 @@ class Predictor:
         X.reshape(-1, 1)
         Y = self.scaler.transform(X)
         forecast = self.forecast_lstm(Y)
-        forecast_real = self.inverse_transform(forecast, current_load)
-        return forecast_real
+        return self.inverse_transform(forecast, current_load)

@@ -59,8 +59,8 @@ class EnumTypeWrapper(object):
     """Returns the value coresponding to the given enum name."""
     if name in self._enum_type.values_by_name:
       return self._enum_type.values_by_name[name].number
-    raise ValueError('Enum %s has no value defined for name %s' % (
-        self._enum_type.name, name))
+    raise ValueError(
+        f'Enum {self._enum_type.name} has no value defined for name {name}')
 
   def keys(self):
     """Return a list of the string names in the enum.
