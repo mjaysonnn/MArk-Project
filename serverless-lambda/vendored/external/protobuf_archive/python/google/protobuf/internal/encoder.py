@@ -89,8 +89,7 @@ def _VarintSize(value):
   if value <= 0x3ffffffffff: return 6
   if value <= 0x1ffffffffffff: return 7
   if value <= 0xffffffffffffff: return 8
-  if value <= 0x7fffffffffffffff: return 9
-  return 10
+  return 9 if value <= 0x7fffffffffffffff else 10
 
 
 def _SignedVarintSize(value):
@@ -104,8 +103,7 @@ def _SignedVarintSize(value):
   if value <= 0x3ffffffffff: return 6
   if value <= 0x1ffffffffffff: return 7
   if value <= 0xffffffffffffff: return 8
-  if value <= 0x7fffffffffffffff: return 9
-  return 10
+  return 9 if value <= 0x7fffffffffffffff else 10
 
 
 def _TagSize(field_number):
@@ -673,9 +671,8 @@ def BoolEncoder(field_number, is_repeated, is_packed):
     tag_bytes = TagBytes(field_number, wire_format.WIRETYPE_VARINT)
     def EncodeField(write, value, unused_deterministic):
       write(tag_bytes)
-      if value:
-        return write(true_byte)
-      return write(false_byte)
+      return write(true_byte) if value else write(false_byte)
+
     return EncodeField
 
 

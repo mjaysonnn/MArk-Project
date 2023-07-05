@@ -91,8 +91,7 @@ class TensorFlowSource(_ModelSource):
 
     def get_request(self, data, ip):
       
-        dct = {'url': url, 'headers': headers, 'data': data, 'timeout': 2}
-        return dct
+        return {'url': url, 'headers': headers, 'data': data, 'timeout': 2}
 
     def setup_config(self, ins, region, typ):
         self. _start_nginx(ins)
@@ -104,7 +103,7 @@ class TensorFlowSource(_ModelSource):
         image_data = [{ "b64": self.test_data},]
 
         if typ.startswith('p2'):
-            image_data = image_data * HANDLE_SIZE_P2
+            image_data *= HANDLE_SIZE_P2
 
         for i in ins:
             while True:
@@ -138,7 +137,9 @@ class TensorFlowSource(_ModelSource):
             utils.check_command(ses, f'sudo cp /etc/nginx/{nginx_conf} /etc/nginx/nginx.conf && sudo systemctl restart nginx')
         
     def _deploy_model(self, region, ips, cmd):
-        return all([utils.check_command(utils.get_session(i), cmd, debug=True) for i in ips])
+        return all(
+            utils.check_command(utils.get_session(i), cmd, debug=True) for i in ips
+        )
 
 class KerasSource(_ModelSource):
 
@@ -153,14 +154,12 @@ class KerasSource(_ModelSource):
         url = f'http://{ip}:8301/invocations'
         files = payload
 
-        dct = {'url': url, 'data': files, 'timeout': 2.5}
-        return dct
+        return {'url': url, 'data': files, 'timeout': 2.5}
 
     def _get_data(self):
         test_file = f'{utils.upper_folder}/keras/SageMaker/cat.jpg'
         with open(test_file, "rb") as f:
-            raw_data = f.read()
-            return raw_data
+            return f.read()
 
     def setup_config(self, ins, region, typ):
         for i in ins:

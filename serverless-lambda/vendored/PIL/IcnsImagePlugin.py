@@ -72,8 +72,7 @@ def read_32(fobj, start_length, size):
                 if byte & 0x80:
                     blocksize = byte - 125
                     byte = fobj.read(1)
-                    for i in range(blocksize):
-                        data.append(byte)
+                    data.extend(byte for _ in range(blocksize))
                 else:
                     blocksize = byte + 1
                     data.append(fobj.read(blocksize))
@@ -208,10 +207,10 @@ class IcnsFile(object):
         return sizes
 
     def bestsize(self):
-        sizes = self.itersizes()
-        if not sizes:
+        if sizes := self.itersizes():
+            return max(sizes)
+        else:
             raise SyntaxError("No 32bit icon resources found")
-        return max(sizes)
 
     def dataforsize(self, size):
         """
@@ -223,7 +222,7 @@ class IcnsFile(object):
         for code, reader in self.SIZES[size]:
             desc = self.dct.get(code)
             if desc is not None:
-                dct.update(reader(self.fobj, desc, size))
+                dct |= reader(self.fobj, desc, size)
         return dct
 
     def getimage(self, size=None):
@@ -314,16 +313,16 @@ def _save(im, fp, filename):
                        im.encoderinfo.get("append_images", [])}
     last_w = None
     for w in [16, 32, 128, 256, 512]:
-        prefix = 'icon_{}x{}'.format(w, w)
+        prefix = f'icon_{w}x{w}'
 
-        first_path = os.path.join(iconset, prefix+'.png')
+        first_path = os.path.join(iconset, f'{prefix}.png')
         if last_w == w:
             shutil.copyfile(second_path, first_path)
         else:
             im_w = provided_images.get(w, im.resize((w, w), Image.LANCZOS))
             im_w.save(first_path)
 
-        second_path = os.path.join(iconset, prefix+'@2x.png')
+        second_path = os.path.join(iconset, f'{prefix}@2x.png')
         im_w2 = provided_images.get(w*2, im.resize((w*2, w*2), Image.LANCZOS))
         im_w2.save(second_path)
         last_w = w*2

@@ -90,9 +90,7 @@ def CUnescape(text):
   def ReplaceHex(m):
     # Only replace the match if the number of leading back slashes is odd. i.e.
     # the slash itself is not escaped.
-    if len(m.group(1)) & 1:
-      return m.group(1) + 'x0' + m.group(2)
-    return m.group(0)
+    return f'{m.group(1)}x0{m.group(2)}' if len(m.group(1)) & 1 else m.group(0)
 
   # This is required because the 'string_escape' encoding doesn't
   # allow single-digit hex escapes (like '\xf').

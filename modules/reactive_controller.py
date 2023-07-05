@@ -28,10 +28,10 @@ class ReactiveController:
         self.interval = interval
 
     def calculateCapacity(self, current_instances):
-        totalCapa = 0
-        for i in range(len(current_instances)):
-            totalCapa += instance_info[i][0] * current_instances[i]
-        return totalCapa
+        return sum(
+            instance_info[i][0] * current_instances[i]
+            for i in range(len(current_instances))
+        )
 
     def findCheap(self, surplus):
         cheapest_i = 0

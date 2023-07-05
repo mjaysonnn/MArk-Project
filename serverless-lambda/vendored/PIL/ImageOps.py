@@ -236,15 +236,13 @@ def equalize(image, mask=None):
         histo = [_f for _f in h[b:b+256] if _f]
         if len(histo) <= 1:
             lut.extend(list(range(256)))
+        elif step := (functools.reduce(operator.add, histo) - histo[-1]) // 255:
+            n = step // 2
+            for i in range(256):
+                lut.append(n // step)
+                n = n + h[i+b]
         else:
-            step = (functools.reduce(operator.add, histo) - histo[-1]) // 255
-            if not step:
-                lut.extend(list(range(256)))
-            else:
-                n = step // 2
-                for i in range(256):
-                    lut.append(n // step)
-                    n = n + h[i+b]
+            lut.extend(list(range(256)))
     return _lut(image, lut)
 
 
@@ -345,12 +343,9 @@ def fit(image, size, method=Image.NEAREST, bleed=0.0, centering=(0.5, 0.5)):
 
     # make the crop
     leftSide = int(liveArea[0] + (float(liveSize[0]-cropWidth) * centering[0]))
-    if leftSide < 0:
-        leftSide = 0
+    leftSide = max(leftSide, 0)
     topSide = int(liveArea[1] + (float(liveSize[1]-cropHeight) * centering[1]))
-    if topSide < 0:
-        topSide = 0
-
+    topSide = max(topSide, 0)
     out = image.crop(
         (leftSide, topSide, leftSide + cropWidth, topSide + cropHeight)
         )
@@ -386,9 +381,7 @@ def invert(image):
     :param image: The image to invert.
     :return: An image.
     """
-    lut = []
-    for i in range(256):
-        lut.append(255-i)
+    lut = [255-i for i in range(256)]
     return _lut(image, lut)
 
 
@@ -410,10 +403,8 @@ def posterize(image, bits):
     :param bits: The number of bits to keep for each channel (1-8).
     :return: An image.
     """
-    lut = []
     mask = ~(2**(8-bits)-1)
-    for i in range(256):
-        lut.append(i & mask)
+    lut = [i & mask for i in range(256)]
     return _lut(image, lut)
 
 

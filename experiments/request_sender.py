@@ -35,8 +35,7 @@ def get_data():
     with open(f'{upper_folder}/resources/test.jpg', 'rb') as f:
         raw_data = f.read()
         base64_bytes = b64encode(raw_data)
-        base64_string = base64_bytes.decode('utf-8')
-        return base64_string
+        return base64_bytes.decode('utf-8')
 
 def send_data(args, reader):
     pool = ThreadPoolExecutor(5000)
@@ -61,8 +60,7 @@ def get_kr_data():
     with open(test_file, 'rb') as f:
         raw_data = f.read()
         base64_bytes = b64encode(raw_data)
-        base64_string = base64_bytes.decode('utf-8')
-        return base64_string
+        return base64_bytes.decode('utf-8')
 
 def send_data_kr(args, reader):
     pool = ThreadPoolExecutor(5000)
@@ -72,7 +70,7 @@ def send_data_kr(args, reader):
         if reader.line_num > args.timeout:
             break
 
-        num = int(int(row['tweets']) / 2)
+        num = int(row['tweets']) // 2
         lam = (60 * 1000.0) / num
         samples = np.random.poisson(lam, num)
         print(f'line: {reader.line_num}; sample_number: {num}')
@@ -93,7 +91,7 @@ def send_data_nmt(args, reader):
         if reader.line_num > args.timeout:
             break
 
-        num = int(int(row['tweets']) / 2)
+        num = int(row['tweets']) // 2
         lam = (60 * 1000.0) / num
         samples = np.random.poisson(lam, num)
         print(f'line: {reader.line_num}; sample_number: {num}')
@@ -128,8 +126,8 @@ def send_data_mx(args, reader):
 def send_fixed_data(args):
     pool = ThreadPoolExecutor(3000)
     data = get_data()
+    num = 3000
     for _ in range(20):
-        num = 3000
         lam = (60 * 1000.0) / num
         samples = np.random.poisson(lam, num)
         for s in samples:

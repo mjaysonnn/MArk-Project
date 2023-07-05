@@ -24,12 +24,8 @@ def get_args():
     return parser.parse_args()
 
 def copy_keys(args, keys):
-    dst_dict = {}
     src_dict = vars(args)
-    for key in keys:
-        if src_dict[key] is not None:
-            dst_dict[key] = src_dict[key]
-    return dst_dict
+    return {key: src_dict[key] for key in keys if src_dict[key] is not None}
 
 """
 port -> just port as we know

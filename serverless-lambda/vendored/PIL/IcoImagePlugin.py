@@ -43,9 +43,13 @@ def _save(im, fp, filename):
                                [(16, 16), (24, 24), (32, 32), (48, 48),
                                 (64, 64), (128, 128), (256, 256)])
     width, height = im.size
-    sizes = filter(lambda x: False if (x[0] > width or x[1] > height or
-                                       x[0] > 256 or x[1] > 256) else True,
-                   sizes)
+    sizes = filter(
+        lambda x: x[0] <= width
+        and x[1] <= height
+        and x[0] <= 256
+        and x[1] <= 256,
+        sizes,
+    )
     sizes = list(sizes)
     fp.write(struct.pack("<H", len(sizes)))  # idCount(2)
     offset = fp.tell() + len(sizes)*16
@@ -97,7 +101,7 @@ class IcoFile(object):
         self.nb_items = i16(s[4:])
 
         # Get headers for each item
-        for i in range(self.nb_items):
+        for _ in range(self.nb_items):
             s = buf.read(16)
 
             icon_header = {
@@ -175,13 +179,8 @@ class IcoFile(object):
 
             # figure out where AND mask image starts
             mode = a[0]
-            bpp = 8
-            for k, v in BmpImagePlugin.BIT2MODE.items():
-                if mode == v[1]:
-                    bpp = k
-                    break
-
-            if 32 == bpp:
+            bpp = next((k for k, v in BmpImagePlugin.BIT2MODE.items() if mode == v[1]), 8)
+            if bpp == 32:
                 # 32-bit color depth icon image allows semitransparent areas
                 # PIL's DIB format ignores transparency bits, recover them.
                 # The DIB is packed in BGRX byte order where X is the alpha

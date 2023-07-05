@@ -71,12 +71,9 @@ class BleachSanitizerMixin(HTMLSanitizerMixin):
                         del attrs['xlink:href']
                     if 'style' in attrs:
                         attrs['style'] = self.sanitize_css(attrs['style'])
-                    token['data'] = [(name, val) for name, val in
-                                     attrs.items()]
+                    token['data'] = list(attrs.items())
                 return token
-            elif self.strip_disallowed_elements:
-                pass
-            else:
+            elif not self.strip_disallowed_elements:
                 if token['type'] == tokenTypes['EndTag']:
                     token['data'] = '</{0!s}>'.format(token['name'])
                 elif token['data']:
@@ -126,9 +123,9 @@ class BleachSanitizerMixin(HTMLSanitizerMixin):
             if not value:
                 continue
             if prop.lower() in self.allowed_css_properties:
-                clean.append(prop + ': ' + value + ';')
+                clean.append(f'{prop}: {value};')
             elif prop.lower() in self.allowed_svg_properties:
-                clean.append(prop + ': ' + value + ';')
+                clean.append(f'{prop}: {value};')
 
         return ' '.join(clean)
 
@@ -142,6 +139,5 @@ class BleachSanitizer(HTMLTokenizer, BleachSanitizerMixin):
 
     def __iter__(self):
         for token in HTMLTokenizer.__iter__(self):
-            token = self.sanitize_token(token)
-            if token:
+            if token := self.sanitize_token(token):
                 yield token

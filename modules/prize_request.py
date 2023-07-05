@@ -74,9 +74,9 @@ def get_spot_prize_by_region_type(region, types):
     '''
     Return a prize list based on the input region and types ($ / sec)
     '''
-    if region == 'us-east-1' or region == 'us-west-1':
-        region = region[0:7]
-    
+    if region in ['us-east-1', 'us-west-1']:
+        region = region[:7]
+
     types = [ t.replace('.', '_') for t in types ]
     prize_list = []
     sizes = spot_prize_accessor.get_prize(region)

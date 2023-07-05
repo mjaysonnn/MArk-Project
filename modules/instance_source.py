@@ -43,23 +43,31 @@ class _InstanceSource():
 
 class OnDemandSource(_InstanceSource):    
     def get_ins_alloc(self, name, balancer):
-        ins_json = demand_aws_accessor.get_cluster(name)
-        if ins_json:
+        if ins_json := demand_aws_accessor.get_cluster(name):
             intance_list = [ utils.dict2Instance(i) for i in ins_json['info'].values() ]
             return balancer.next_ip(name, intance_list)
 
     def get_current_ins_and_prize(self, name, index_type):
-        aws_info = demand_aws_accessor.get_cluster(name)
-        intance_list = []
-        if aws_info:
+        if aws_info := demand_aws_accessor.get_cluster(name):
             intance_list = [utils.dict2Instance(i) for i in aws_info['info'].values()]
+        else:
+            intance_list = []
         currentInstance = []
         [ currentInstance.append(len([ i for i in intance_list if i.typ == typ and i.region == DEFAULT_REGION])) for typ in index_type ]
 
         info = pre_demand_aws_accessor.get_cluster(name)
         if info and info['info']:
             c_tmp = []
-            [ c_tmp.append(sum([ i['num'] for _, i in info['info'].items() if i['type'] == typ and i['region'] == DEFAULT_REGION])) for typ in index_type ]
+            [
+                c_tmp.append(
+                    sum(
+                        i['num']
+                        for _, i in info['info'].items()
+                        if i['type'] == typ and i['region'] == DEFAULT_REGION
+                    )
+                )
+                for typ in index_type
+            ]
             currentInstance = [ (e1 + e2) for e1, e2 in zip(currentInstance, c_tmp)]
         prize_list = prize_request.get_demand_prize_by_region_type(DEFAULT_REGION, index_type)
         return currentInstance, prize_list
@@ -111,7 +119,16 @@ class SpotSource(_InstanceSource):
         info = pre_aws_accessor.get_cluster(name)
         if info['info']:
             c_tmp = []
-            [ c_tmp.append(sum([ i['num'] for _, i in info['info'].items() if i['type'] == typ and i['region'] == DEFAULT_REGION])) for typ in index_type ]
+            [
+                c_tmp.append(
+                    sum(
+                        i['num']
+                        for _, i in info['info'].items()
+                        if i['type'] == typ and i['region'] == DEFAULT_REGION
+                    )
+                )
+                for typ in index_type
+            ]
             currentInstance = [ (e1 + e2) for e1, e2 in zip(currentInstance, c_tmp)]            
 
         prize_list = prize_request.get_spot_prize_by_region_type(DEFAULT_REGION, index_type)

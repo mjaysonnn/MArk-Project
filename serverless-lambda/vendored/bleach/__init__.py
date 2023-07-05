@@ -317,8 +317,8 @@ def linkify(text, callbacks=DEFAULT_CALLBACKS, skip_pre=False,
                                         current_child + 1)
                     children += adj
 
-            if node.tag == ETREE_TAG('a') and not (node in _seen):
-                if not node.get('href', None) is None:
+            if node.tag == ETREE_TAG('a') and node not in _seen:
+                if node.get('href', None) is not None:
                     attrs = dict(node.items())
 
                     _text = attrs['_text'] = _render_inner(node)
@@ -347,7 +347,7 @@ def linkify(text, callbacks=DEFAULT_CALLBACKS, skip_pre=False,
             elif current_child >= 0:
                 if node.tag == ETREE_TAG('pre') and skip_pre:
                     linkify_nodes(node, False)
-                elif not (node in _seen):
+                elif node not in _seen:
                     linkify_nodes(node, parse_text)
 
             current_child += 1
@@ -388,13 +388,9 @@ def linkify(text, callbacks=DEFAULT_CALLBACKS, skip_pre=False,
         end = ''
         m = re.search(punct_re, url)
         if m:
-            end = m.group(0)
-            url = url[0:m.start()]
-        if re.search(proto_re, url):
-            href = url
-        else:
-            href = ''.join(['http://', url])
-
+            end = m[0]
+            url = url[:m.start()]
+        href = url if re.search(proto_re, url) else ''.join(['http://', url])
         link = {
             '_text': url,
             'href': href,

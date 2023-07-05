@@ -53,7 +53,7 @@ class GdImageFile(ImageFile.ImageFile):
         s = self.fp.read(775)
 
         self.mode = "L"  # FIXME: "P"
-        self.size = i16(s[0:2]), i16(s[2:4])
+        self.size = i16(s[:2]), i16(s[2:4])
 
         # transparency index
         tindex = i16(s[5:7])

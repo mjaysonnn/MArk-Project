@@ -145,21 +145,17 @@ def _save(im, fp, filename):
     try:
         rawmode, bits, colormaptype, imagetype = SAVE[im.mode]
     except KeyError:
-        raise IOError("cannot write mode %s as TGA" % im.mode)
+        raise IOError(f"cannot write mode {im.mode} as TGA")
 
     if colormaptype:
         colormapfirst, colormaplength, colormapentry = 0, 256, 24
     else:
         colormapfirst, colormaplength, colormapentry = 0, 0, 0
 
-    if im.mode == "RGBA":
-        flags = 8
-    else:
-        flags = 0
-
+    flags = 8 if im.mode == "RGBA" else 0
     orientation = im.info.get("orientation", -1)
     if orientation > 0:
-        flags = flags | 0x20
+        flags |= 0x20
 
     fp.write(b"\000" +
              o8(colormaptype) +

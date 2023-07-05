@@ -52,12 +52,12 @@ class DcxImageFile(PcxImageFile):
 
         # Component directory
         self._offset = []
-        for i in range(1024):
-            offset = i32(self.fp.read(4))
-            if not offset:
-                break
-            self._offset.append(offset)
+        for _ in range(1024):
+            if offset := i32(self.fp.read(4)):
+                self._offset.append(offset)
 
+            else:
+                break
         self.__fp = self.fp
         self.frame = None
         self.seek(0)

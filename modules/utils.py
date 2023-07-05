@@ -27,10 +27,7 @@ def _gcd_in_two(x, y):
     max_val = max(x, y)
     min_val = min(x, y)
 
-    if min_val == 0:
-        return max_val
-    else:
-        return _gcd_in_two(min_val, max_val % min_val)
+    return max_val if min_val == 0 else _gcd_in_two(min_val, max_val % min_val)
 
 decode_image = lambda raw_data: b64decode(raw_data)
     
@@ -70,10 +67,10 @@ def dict2Instance(dct):
 def parse_instances(cursor):
     lst = []
     [ lst.append(c) for c in cursor ]
-    res = {}
-    for dct in lst:
-        res[dct['name']] = [ dict2Instance(i) for i in dct['instances'] ]
-    return res
+    return {
+        dct['name']: [dict2Instance(i) for i in dct['instances']]
+        for dct in lst
+    }
 
 def get_session(ip):
     ssh = paramiko.client.SSHClient()

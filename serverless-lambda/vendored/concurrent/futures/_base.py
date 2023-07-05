@@ -219,9 +219,9 @@ def as_completed(fs, timeout=None):
     fs = set(fs)
     total_futures = len(fs)
     with _AcquireFutures(fs):
-        finished = set(
-                f for f in fs
-                if f._state in [CANCELLED_AND_NOTIFIED, FINISHED])
+        finished = {
+            f for f in fs if f._state in [CANCELLED_AND_NOTIFIED, FINISHED]
+        }
         pending = fs - finished
         waiter = _create_and_install_waiters(fs, _AS_COMPLETED)
     finished = list(finished)
@@ -288,8 +288,9 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
         futures.
     """
     with _AcquireFutures(fs):
-        done = set(f for f in fs
-                   if f._state in [CANCELLED_AND_NOTIFIED, FINISHED])
+        done = {
+            f for f in fs if f._state in [CANCELLED_AND_NOTIFIED, FINISHED]
+        }
         not_done = set(fs) - done
 
         if (return_when == FIRST_COMPLETED) and done:
@@ -403,17 +404,14 @@ class Future(object):
             return self._state in [CANCELLED, CANCELLED_AND_NOTIFIED, FINISHED]
 
     def __get_result(self):
-        if self._exception:
-            if isinstance(self._exception, types.InstanceType):
-                # The exception is an instance of an old-style class, which
-                # means type(self._exception) returns types.ClassType instead
-                # of the exception's actual class type.
-                exception_type = self._exception.__class__
-            else:
-                exception_type = type(self._exception)
-            raise exception_type, self._exception, self._traceback
-        else:
+        if not self._exception:
             return self._result
+        exception_type = (
+            self._exception.__class__
+            if isinstance(self._exception, types.InstanceType)
+            else type(self._exception)
+        )
+        raise exception_type, self._exception, self._traceback
 
     def add_done_callback(self, fn):
         """Attaches a callable that will be called when the future finishes.
