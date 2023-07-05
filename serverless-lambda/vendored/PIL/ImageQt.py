@@ -109,10 +109,11 @@ def align8to32(bytes, width, mode):
     if not extra_padding:
         return bytes
 
-    new_data = []
-    for i in range(len(bytes) // bytes_per_line):
-        new_data.append(bytes[i*bytes_per_line:(i+1)*bytes_per_line] + b'\x00' * extra_padding)
-
+    new_data = [
+        bytes[i * bytes_per_line : (i + 1) * bytes_per_line]
+        + b'\x00' * extra_padding
+        for i in range(len(bytes) // bytes_per_line)
+    ]
     return b''.join(new_data)
 
 
@@ -120,9 +121,7 @@ def _toqclass_helper(im):
     data = None
     colortable = None
 
-    # handle filename, if given instead of image name
     if hasattr(im, "toUtf8"):
-        # FIXME - is this really the best way to do this?
         if str is bytes:
             im = unicode(im.toUtf8(), "utf-8")
         else:
@@ -134,15 +133,11 @@ def _toqclass_helper(im):
         format = QImage.Format_Mono
     elif im.mode == "L":
         format = QImage.Format_Indexed8
-        colortable = []
-        for i in range(256):
-            colortable.append(rgb(i, i, i))
+        colortable = [rgb(i, i, i) for i in range(256)]
     elif im.mode == "P":
         format = QImage.Format_Indexed8
-        colortable = []
         palette = im.getpalette()
-        for i in range(0, len(palette), 3):
-            colortable.append(rgb(*palette[i:i+3]))
+        colortable = [rgb(*palette[i:i+3]) for i in range(0, len(palette), 3)]
     elif im.mode == "RGB":
         data = im.tobytes("raw", "BGRX")
         format = QImage.Format_RGB32

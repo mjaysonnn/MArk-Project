@@ -29,9 +29,11 @@ class Scheduler():
     def set_loop(self, loop_):
         self.loop = loop_
         logging.info('starting scheduler')
-        self.predictor = load_predictor.Predictor(init_load=2964, 
-            model_path=utils.upper_folder +'/resources/my_model_32.h5',
-            scaler_path=utils.upper_folder +'/resources/my_scaler.save')
+        self.predictor = load_predictor.Predictor(
+            init_load=2964,
+            model_path=f'{utils.upper_folder}/resources/my_model_32.h5',
+            scaler_path=f'{utils.upper_folder}/resources/my_scaler.save',
+        )
         self.warm_up_num = {}
         self.count = {}
         self.res_list = []
@@ -66,7 +68,7 @@ class Scheduler():
         while True:
             # await asyncio.sleep(PREDICTOR_PARAM[1])
 
-            for i in range(0,PREDICTOR_PARAM[1]//PREDICTOR_WINDOW):
+            for _ in range(0,PREDICTOR_PARAM[1]//PREDICTOR_WINDOW):
                 await asyncio.sleep(PREDICTOR_WINDOW)
                 for name in self.count.keys():
                     if self.count[name] > max_count_window:
@@ -87,25 +89,22 @@ class Scheduler():
                     max_count_window = 0
                     self.warm_up_num[name] -= 1
                     continue
-                
+
                 currentInstance, prize_list = ins_source.get_current_ins_and_prize(name, IndexType)
                 if prize_list is None:
                     logging.info(f'Prize uavailable for {IndexType}')
                     self.count[name] = 0
                     max_count_window = 0
                     continue
-                # logging.info(f': Updated prize_list')
-                instanceInfo = []
-                for i in range(len(IndexType)):
-                    instanceInfo.append([Capacity[i], prize_list[i], prize_list[i] * 180])
-
+                instanceInfo = [
+                    [Capacity[i], prize_list[i], prize_list[i] * 180]
+                    for i in range(len(IndexType))
+                ]
                 # forecasts = self.predictor.predict(max_count_window * Times)
 
                 # logging.info(f': Updated forecasts')
 
-                if max_count < max_count_window:
-                    max_count = max_count_window
-
+                max_count = max(max_count, max_count_window)
                 forecasts = [max_count * Times] * 50
 
 
@@ -118,12 +117,12 @@ class Scheduler():
                     des_list = reduce(col_max_values, [ res[0] for res in self.res_list ])
                     des = [ max(c - d, 0) for c, d in zip(currentInstance, des_list) ]
                     self.res_list.remove(self.res_list[0])
-                    
-                logging.info(f'Results: {results}; Current: {currentInstance}; Launch: {launch}; Destroy: {des}')                
-                cost = 0
-                for i in range(len(currentInstance)):
-                    cost += instanceInfo[i][1] * 60 * currentInstance[i]
 
+                logging.info(f'Results: {results}; Current: {currentInstance}; Launch: {launch}; Destroy: {des}')
+                cost = sum(
+                    instanceInfo[i][1] * 60 * currentInstance[i]
+                    for i in range(len(currentInstance))
+                )
                 for i in range(len(launch)):
                     if launch[i] > 0:
                         logging.info(f'Launch {launch[i]} {IndexType[i]} instances for model: {name}')

@@ -28,10 +28,10 @@ class ProactiveController:
         self.interval = interval
 
     def calculateCapacity(self, current_instances):
-        totalCapa = 0
-        for i in range(len(current_instances)):
-            totalCapa += self.instance_info[i][0] * current_instances[i]
-        return totalCapa
+        return sum(
+            self.instance_info[i][0] * current_instances[i]
+            for i in range(len(current_instances))
+        )
 
     def findCheap(self, t_start, t_stop, residualForecasts, time_span):
         cheapest_i = 0
@@ -39,10 +39,13 @@ class ProactiveController:
         for i in range(len(self.instance_info)):
             total_cost = self.instance_info[i][1] * time_span + self.instance_info[i][2]
             i_capacity = self.instance_info[i][0]
-            counted = 0
-            for j in range(t_stop - t_start):
-                if (residualForecasts[t_start + j] > 0):
-                    counted += i_capacity if (residualForecasts[t_start + j] >= i_capacity) else residualForecasts[t_start + j]
+            counted = sum(
+                i_capacity
+                if (residualForecasts[t_start + j] >= i_capacity)
+                else residualForecasts[t_start + j]
+                for j in range(t_stop - t_start)
+                if (residualForecasts[t_start + j] > 0)
+            )
             cost_per_r = (total_cost * 1.0) / counted
             #print('i:'+str(i)+' total_cost:'+str(total_cost)+' i_capacity:'+str(i_capacity)+' cost_p:'+str(cost_per_r))
             if lowest_cost >= cost_per_r:
@@ -61,12 +64,15 @@ class ProactiveController:
                 continue
             total_cost = self.instance_info[i][1] * time_span
             i_capacity = self.instance_info[i][0]
-            
+
             if (-1 *high_demand) < i_capacity:
                 continue
-            counted = 0
-            for j in range(t_stop - t_start):
-                    counted +=  i_capacity if (residualForecasts[t_start + j] <= i_capacity) else - residualForecasts[t_start + j]
+            counted = sum(
+                i_capacity
+                if (residualForecasts[t_start + j] <= i_capacity)
+                else -residualForecasts[t_start + j]
+                for j in range(t_stop - t_start)
+            )
             cost_per_r = (total_cost * 1.0) / counted
             #print('i:'+str(i)+' total_cost:'+str(total_cost)+' i_capacity:'+str(i_capacity)+' cost_p:'+str(cost_per_r))
             if highest_cost <= cost_per_r:
@@ -77,7 +83,7 @@ class ProactiveController:
     def fill(self, t_start, t_stop, residualForecasts):
         #print('fill t_start: '+str(t_start)+' t_stop: '+str(t_stop))
         time_span = t_stop * self.interval #timespan in seconds
-        time_span = time_span if (time_span > 60) else 60
+        time_span = max(time_span, 60)
         #print('timespan: '+str(time_span))
         cheapest_i = self.findCheap(t_start, t_stop, residualForecasts, time_span)
         #print('cheapest_i '+str(cheapest_i))
@@ -101,7 +107,7 @@ class ProactiveController:
     def kill(self, t_start, t_stop, residualForecasts):
         #print('fill t_start: '+str(t_start)+' t_stop: '+str(t_stop))
         time_span = t_stop * self.interval
-        time_span = time_span if (time_span > 60) else 60
+        time_span = max(time_span, 60)
         highest_i = self.findHigh(t_start, t_stop, residualForecasts, time_span)
         #print('highest_i '+str(highest_i))
         if highest_i == -1:
@@ -124,9 +130,9 @@ class ProactiveController:
             return
         totalCapa = self.calculateCapacity(self.instance_plan[t_current])
         residualForecasts = [ x - totalCapa for x in self.forecasts]
+        t_stop = 0
         #print(residualForecasts)
         if (residualForecasts[t_current] >= 0):
-            t_stop = 0
             for i in range(len(residualForecasts) - t_current):
                 if (residualForecasts[i + t_current] >= 0):
                     t_stop += 1
@@ -135,7 +141,6 @@ class ProactiveController:
             #print('fill t_stop:' + str(t_stop))
             self.fill(t_current, t_stop, residualForecasts)
         else:
-            t_stop = 0
             for i in range(len(residualForecasts) - t_current):
                 if (residualForecasts[i+ t_current] < 0):
                     t_stop +=1
@@ -154,7 +159,7 @@ class ProactiveController:
         """
         self.instance_info = instance_info
         # step + 1, index 0 means current, 1 means the first prediction
-        self.instance_plan = [current_instances.copy() for i in range(self.step)]
+        self.instance_plan = [current_instances.copy() for _ in range(self.step)]
         self.forecasts = forecasts
         #print(self.instance_plan)
         self.greedyFind(0)

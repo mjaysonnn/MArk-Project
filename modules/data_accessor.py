@@ -26,8 +26,7 @@ class PrizeAccessor(_BaseAccessor):
             )
     
     def get_prize(self, region):
-        record = self.collection.find_one({'region' : region})
-        if record:
+        if record := self.collection.find_one({'region': region}):
             return record['sizes']
 
 class AWSAccessor(_BaseAccessor):
@@ -40,8 +39,7 @@ class AWSAccessor(_BaseAccessor):
         self.collection.update({'name' : name}, doc, upsert=True)
     
     def get_by_region_typ(self, name, region, typ):
-        record = self.collection.find_one({'name' : name})
-        if record:
+        if record := self.collection.find_one({'name': name}):
             for r, info in record['info'].items():
                 if info['region'] == region and info['type'] == typ:
                     return (r, info['instance_id_list'])
@@ -61,8 +59,7 @@ class AWSAccessor(_BaseAccessor):
         [self.del_request(name, id) for id in ids]
 
     def get_requests(self, name):
-        record = self.collection.find_one({'name' : name})
-        if record:
+        if record := self.collection.find_one({'name': name}):
             return record['info'].keys()
 
 class InstanceAccessor(_BaseAccessor):
@@ -75,8 +72,7 @@ class InstanceAccessor(_BaseAccessor):
         self.collection.update({'name' : name}, doc, upsert=True)
 
     def get_instances(self, name):
-        record = self.collection.find_one({'name' : name})
-        if record:
+        if record := self.collection.find_one({'name': name}):
             return record['instances']
     
     def get_all_instances(self):

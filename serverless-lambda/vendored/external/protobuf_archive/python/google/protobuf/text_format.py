@@ -100,10 +100,7 @@ class ParseError(Error):
 class TextWriter(object):
 
   def __init__(self, as_utf8):
-    if six.PY2:
-      self._writer = io.BytesIO()
-    else:
-      self._writer = io.StringIO()
+    self._writer = io.BytesIO() if six.PY2 else io.StringIO()
 
   def write(self, val):
     if six.PY2:
@@ -163,9 +160,7 @@ def MessageToString(message,
   printer.PrintMessage(message)
   result = out.getvalue()
   out.close()
-  if as_one_line:
-    return result.rstrip()
-  return result
+  return result.rstrip() if as_one_line else result
 
 
 def _IsMapEntry(field):
@@ -301,11 +296,10 @@ class _Printer(object):
 
   def _TryPrintAsAnyMessage(self, message):
     """Serializes if message is a google.protobuf.Any field."""
-    packed_message = _BuildMessageFromTypeName(message.TypeName(),
-                                               self.descriptor_pool)
-    if packed_message:
+    if packed_message := _BuildMessageFromTypeName(message.TypeName(),
+                                                   self.descriptor_pool):
       packed_message.MergeFromString(message.value)
-      self.out.write('%s[%s]' % (self.indent * ' ', message.type_url))
+      self.out.write(f"{self.indent * ' '}[{message.type_url}]")
       self._PrintMessageFieldValue(packed_message)
       self.out.write(' ' if self.as_one_line else '\n')
       return True
@@ -359,21 +353,20 @@ class _Printer(object):
     out.write(' ' * self.indent)
     if self.use_field_number:
       out.write(str(field.number))
-    else:
-      if field.is_extension:
-        out.write('[')
-        if (field.containing_type.GetOptions().message_set_wire_format and
-            field.type == descriptor.FieldDescriptor.TYPE_MESSAGE and
-            field.label == descriptor.FieldDescriptor.LABEL_OPTIONAL):
-          out.write(field.message_type.full_name)
-        else:
-          out.write(field.full_name)
-        out.write(']')
-      elif field.type == descriptor.FieldDescriptor.TYPE_GROUP:
-        # For groups, use the capitalized name.
-        out.write(field.message_type.name)
+    elif field.is_extension:
+      out.write('[')
+      if (field.containing_type.GetOptions().message_set_wire_format and
+          field.type == descriptor.FieldDescriptor.TYPE_MESSAGE and
+          field.label == descriptor.FieldDescriptor.LABEL_OPTIONAL):
+        out.write(field.message_type.full_name)
       else:
-        out.write(field.name)
+        out.write(field.full_name)
+      out.write(']')
+    elif field.type == descriptor.FieldDescriptor.TYPE_GROUP:
+      # For groups, use the capitalized name.
+      out.write(field.message_type.name)
+    else:
+      out.write(field.name)
 
     if field.cpp_type != descriptor.FieldDescriptor.CPPTYPE_MESSAGE:
       # The colon is optional in this case, but our cross-language golden files
@@ -395,7 +388,7 @@ class _Printer(object):
       closeb = '}'
 
     if self.as_one_line:
-      self.out.write(' %s ' % openb)
+      self.out.write(f' {openb} ')
       self.PrintMessage(value)
       self.out.write(closeb)
     else:
@@ -645,8 +638,8 @@ class _Parser(object):
 
       if not message_descriptor.is_extendable:
         raise tokenizer.ParseErrorPreviousToken(
-            'Message type "%s" does not have extensions.' %
-            message_descriptor.full_name)
+            f'Message type "{message_descriptor.full_name}" does not have extensions.'
+        )
       # pylint: disable=protected-access
       field = message.Extensions._FindExtensionByName(name)
       # pylint: enable=protected-access
@@ -662,8 +655,8 @@ class _Parser(object):
               'that message\'s _pb2 module must be imported as well' % name)
       elif message_descriptor != field.containing_type:
         raise tokenizer.ParseErrorPreviousToken(
-            'Extension "%s" does not extend message type "%s".' %
-            (name, message_descriptor.full_name))
+            f'Extension "{name}" does not extend message type "{message_descriptor.full_name}".'
+        )
 
       tokenizer.Consume(']')
 
@@ -691,8 +684,8 @@ class _Parser(object):
 
       if not field:
         raise tokenizer.ParseErrorPreviousToken(
-            'Message type "%s" has no field named "%s".' %
-            (message_descriptor.full_name, name))
+            f'Message type "{message_descriptor.full_name}" has no field named "{name}".'
+        )
 
     if field:
       if not self._allow_multiple_scalars and field.containing_oneof:
@@ -782,12 +775,11 @@ class _Parser(object):
       expanded_any_sub_message = _BuildMessageFromTypeName(packed_type_name,
                                                            self.descriptor_pool)
       if not expanded_any_sub_message:
-        raise ParseError('Type %s not found in descriptor pool' %
-                         packed_type_name)
+        raise ParseError(f'Type {packed_type_name} not found in descriptor pool')
       while not tokenizer.TryConsume(expanded_any_end_token):
         if tokenizer.AtEnd():
-          raise tokenizer.ParseErrorPreviousToken('Expected "%s".' %
-                                                  (expanded_any_end_token,))
+          raise tokenizer.ParseErrorPreviousToken(
+              f'Expected "{expanded_any_end_token}".')
         self._MergeField(tokenizer, expanded_any_sub_message)
       if field.label == descriptor.FieldDescriptor.LABEL_REPEATED:
         any_message = getattr(message, field.name).add()
@@ -811,7 +803,7 @@ class _Parser(object):
 
     while not tokenizer.TryConsume(end_token):
       if tokenizer.AtEnd():
-        raise tokenizer.ParseErrorPreviousToken('Expected "%s".' % (end_token,))
+        raise tokenizer.ParseErrorPreviousToken(f'Expected "{end_token}".')
       self._MergeField(tokenizer, sub_message)
 
     if is_map_entry:
@@ -884,18 +876,17 @@ class _Parser(object):
         if (not self._allow_multiple_scalars and can_check_presence and
             message.HasExtension(field)):
           raise tokenizer.ParseErrorPreviousToken(
-              'Message type "%s" should not have multiple "%s" extensions.' %
-              (message.DESCRIPTOR.full_name, field.full_name))
+              f'Message type "{message.DESCRIPTOR.full_name}" should not have multiple "{field.full_name}" extensions.'
+          )
         else:
           message.Extensions[field] = value
-      else:
-        if (not self._allow_multiple_scalars and can_check_presence and
+      elif (not self._allow_multiple_scalars and can_check_presence and
             message.HasField(field.name)):
-          raise tokenizer.ParseErrorPreviousToken(
-              'Message type "%s" should not have multiple "%s" fields.' %
-              (message.DESCRIPTOR.full_name, field.name))
-        else:
-          setattr(message, field.name, value)
+        raise tokenizer.ParseErrorPreviousToken(
+            f'Message type "{message.DESCRIPTOR.full_name}" should not have multiple "{field.name}" fields.'
+        )
+      else:
+        setattr(message, field.name, value)
 
 
 def _SkipFieldContents(tokenizer):
@@ -978,7 +969,7 @@ def _SkipFieldValue(tokenizer):
   if (not tokenizer.TryConsumeIdentifier() and
       not _TryConsumeInt64(tokenizer) and not _TryConsumeUint64(tokenizer) and
       not tokenizer.TryConsumeFloat()):
-    raise ParseError('Invalid field value: ' + tokenizer.token)
+    raise ParseError(f'Invalid field value: {tokenizer.token}')
 
 
 class Tokenizer(object):
@@ -1076,7 +1067,7 @@ class Tokenizer(object):
       ParseError: If the text couldn't be consumed.
     """
     if not self.TryConsume(token):
-      raise self.ParseError('Expected "%s".' % token)
+      raise self.ParseError(f'Expected "{token}".')
 
   def ConsumeComment(self):
     result = self.token
@@ -1141,7 +1132,7 @@ class Tokenizer(object):
     """
     result = self.token
     if not self._IDENTIFIER_OR_NUMBER.match(result):
-      raise self.ParseError('Expected identifier or number, got %s.' % result)
+      raise self.ParseError(f'Expected identifier or number, got {result}.')
     self.NextToken()
     return result
 
@@ -1472,10 +1463,7 @@ def _ParseAbstractInteger(text, is_long=False):
     # We force 32-bit values to int and 64-bit values to long to make
     # alternate implementations where the distinction is more significant
     # (e.g. the C++ implementation) simpler.
-    if is_long:
-      return long(text, 0)
-    else:
-      return int(text, 0)
+    return long(text, 0) if is_long else int(text, 0)
   except ValueError:
     raise ValueError('Couldn\'t parse integer: %s' % text)
 
@@ -1498,10 +1486,7 @@ def ParseFloat(text):
   except ValueError:
     # Check alternative spellings.
     if _FLOAT_INFINITY.match(text):
-      if text[0] == '-':
-        return float('-inf')
-      else:
-        return float('inf')
+      return float('-inf') if text[0] == '-' else float('inf')
     elif _FLOAT_NAN.match(text):
       return float('nan')
     else:
@@ -1555,8 +1540,9 @@ def ParseEnum(field, value):
     # Identifier.
     enum_value = enum_descriptor.values_by_name.get(value, None)
     if enum_value is None:
-      raise ValueError('Enum type "%s" has no value named %s.' %
-                       (enum_descriptor.full_name, value))
+      raise ValueError(
+          f'Enum type "{enum_descriptor.full_name}" has no value named {value}.'
+      )
   else:
     # Numeric value.
     enum_value = enum_descriptor.values_by_number.get(number, None)

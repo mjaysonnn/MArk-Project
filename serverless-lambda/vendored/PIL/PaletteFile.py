@@ -33,7 +33,7 @@ class PaletteFile(object):
 
             if not s:
                 break
-            if s[0:1] == b"#":
+            if s[:1] == b"#":
                 continue
             if len(s) > 100:
                 raise SyntaxError("bad palette file")

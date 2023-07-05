@@ -27,7 +27,7 @@ VERBOSE = 0
 
 
 def _isconstant(v):
-    return isinstance(v, int) or isinstance(v, float)
+    return isinstance(v, (int, float))
 
 
 class _Operand(object):
@@ -37,21 +37,20 @@ class _Operand(object):
         self.im = im
 
     def __fixup(self, im1):
-        # convert image to suitable mode
-        if isinstance(im1, _Operand):
-            # argument was an image.
-            if im1.im.mode in ("1", "L"):
-                return im1.im.convert("I")
-            elif im1.im.mode in ("I", "F"):
-                return im1.im
-            else:
-                raise ValueError("unsupported mode: %s" % im1.im.mode)
-        else:
+        if not isinstance(im1, _Operand):
             # argument was a constant
-            if _isconstant(im1) and self.im.mode in ("1", "L", "I"):
-                return Image.new("I", self.im.size, im1)
-            else:
-                return Image.new("F", self.im.size, im1)
+            return (
+                Image.new("I", self.im.size, im1)
+                if _isconstant(im1) and self.im.mode in ("1", "L", "I")
+                else Image.new("F", self.im.size, im1)
+            )
+            # argument was an image.
+        if im1.im.mode in ("1", "L"):
+            return im1.im.convert("I")
+        elif im1.im.mode in ("I", "F"):
+            return im1.im
+        else:
+            raise ValueError(f"unsupported mode: {im1.im.mode}")
 
     def apply(self, op, im1, im2=None, mode=None):
         im1 = self.__fixup(im1)
@@ -60,9 +59,9 @@ class _Operand(object):
             out = Image.new(mode or im1.mode, im1.size, None)
             im1.load()
             try:
-                op = getattr(_imagingmath, op+"_"+im1.mode)
+                op = getattr(_imagingmath, f"{op}_{im1.mode}")
             except AttributeError:
-                raise TypeError("bad operand type for '%s'" % op)
+                raise TypeError(f"bad operand type for '{op}'")
             _imagingmath.unop(op, out.im.id, im1.im.id)
         else:
             # binary operation
@@ -73,8 +72,8 @@ class _Operand(object):
                     im1 = im1.convert("F")
                 if im2.mode != "F":
                     im2 = im2.convert("F")
-                if im1.mode != im2.mode:
-                    raise ValueError("mode mismatch")
+            if im1.mode != im2.mode:
+                raise ValueError("mode mismatch")
             if im1.size != im2.size:
                 # crop both arguments to a common size
                 size = (min(im1.size[0], im2.size[0]),
@@ -89,9 +88,9 @@ class _Operand(object):
             im1.load()
             im2.load()
             try:
-                op = getattr(_imagingmath, op+"_"+im1.mode)
+                op = getattr(_imagingmath, f"{op}_{im1.mode}")
             except AttributeError:
-                raise TypeError("bad operand type for '%s'" % op)
+                raise TypeError(f"bad operand type for '{op}'")
             _imagingmath.binop(op, out.im.id, im1.im.id, im2.im.id)
         return _Operand(out)
 
@@ -236,10 +235,7 @@ def imagemath_convert(self, mode):
     return _Operand(self.im.convert(mode))
 
 
-ops = {}
-for k, v in list(globals().items()):
-    if k[:10] == "imagemath_":
-        ops[k[10:]] = v
+ops = {k[10:]: v for k, v in list(globals().items()) if k[:10] == "imagemath_"}
 
 
 def eval(expression, _dict={}, **kw):

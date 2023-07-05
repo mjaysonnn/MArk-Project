@@ -42,7 +42,7 @@ from google.protobuf import message_factory
 
 
 def _GetMessageFromFactory(factory, full_name):
-  """Get a proto class from the MessageFactory by name.
+    """Get a proto class from the MessageFactory by name.
 
   Args:
     factory: a MessageFactory instance.
@@ -52,13 +52,12 @@ def _GetMessageFromFactory(factory, full_name):
   Raises:
     KeyError, if the proto is not found in the factory's descriptor pool.
   """
-  proto_descriptor = factory.pool.FindMessageTypeByName(full_name)
-  proto_cls = factory.GetPrototype(proto_descriptor)
-  return proto_cls
+    proto_descriptor = factory.pool.FindMessageTypeByName(full_name)
+    return factory.GetPrototype(proto_descriptor)
 
 
 def MakeSimpleProtoClass(fields, full_name=None, pool=None):
-  """Create a Protobuf class whose fields are basic types.
+    """Create a Protobuf class whose fields are basic types.
 
   Note: this doesn't validate field names!
 
@@ -71,46 +70,44 @@ def MakeSimpleProtoClass(fields, full_name=None, pool=None):
   Returns:
     a class, the new protobuf class with a FileDescriptor.
   """
-  factory = message_factory.MessageFactory(pool=pool)
+    factory = message_factory.MessageFactory(pool=pool)
 
-  if full_name is not None:
-    try:
-      proto_cls = _GetMessageFromFactory(factory, full_name)
-      return proto_cls
-    except KeyError:
-      # The factory's DescriptorPool doesn't know about this class yet.
-      pass
+    if full_name is not None:
+        try:
+            return _GetMessageFromFactory(factory, full_name)
+        except KeyError:
+          # The factory's DescriptorPool doesn't know about this class yet.
+          pass
 
-  # Get a list of (name, field_type) tuples from the fields dict. If fields was
-  # an OrderedDict we keep the order, but otherwise we sort the field to ensure
-  # consistent ordering.
-  field_items = fields.items()
-  if not isinstance(fields, OrderedDict):
-    field_items = sorted(field_items)
+    # Get a list of (name, field_type) tuples from the fields dict. If fields was
+    # an OrderedDict we keep the order, but otherwise we sort the field to ensure
+    # consistent ordering.
+    field_items = fields.items()
+    if not isinstance(fields, OrderedDict):
+      field_items = sorted(field_items)
 
-  # Use a consistent file name that is unlikely to conflict with any imported
-  # proto files.
-  fields_hash = hashlib.sha1()
-  for f_name, f_type in field_items:
-    fields_hash.update(f_name.encode('utf-8'))
-    fields_hash.update(str(f_type).encode('utf-8'))
-  proto_file_name = fields_hash.hexdigest() + '.proto'
+    # Use a consistent file name that is unlikely to conflict with any imported
+    # proto files.
+    fields_hash = hashlib.sha1()
+    for f_name, f_type in field_items:
+      fields_hash.update(f_name.encode('utf-8'))
+      fields_hash.update(str(f_type).encode('utf-8'))
+    proto_file_name = f'{fields_hash.hexdigest()}.proto'
 
-  # If the proto is anonymous, use the same hash to name it.
-  if full_name is None:
-    full_name = ('net.proto2.python.public.proto_builder.AnonymousProto_' +
-                 fields_hash.hexdigest())
-    try:
-      proto_cls = _GetMessageFromFactory(factory, full_name)
-      return proto_cls
-    except KeyError:
-      # The factory's DescriptorPool doesn't know about this class yet.
-      pass
+      # If the proto is anonymous, use the same hash to name it.
+    if full_name is None:
+        full_name = ('net.proto2.python.public.proto_builder.AnonymousProto_' +
+                     fields_hash.hexdigest())
+        try:
+            return _GetMessageFromFactory(factory, full_name)
+        except KeyError:
+          # The factory's DescriptorPool doesn't know about this class yet.
+          pass
 
-  # This is the first time we see this proto: add a new descriptor to the pool.
-  factory.pool.Add(
-      _MakeFileDescriptorProto(proto_file_name, full_name, field_items))
-  return _GetMessageFromFactory(factory, full_name)
+    # This is the first time we see this proto: add a new descriptor to the pool.
+    factory.pool.Add(
+        _MakeFileDescriptorProto(proto_file_name, full_name, field_items))
+    return _GetMessageFromFactory(factory, full_name)
 
 
 def _MakeFileDescriptorProto(proto_file_name, full_name, field_items):

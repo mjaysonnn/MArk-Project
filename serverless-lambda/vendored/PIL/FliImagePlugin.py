@@ -44,9 +44,11 @@ class FliImageFile(ImageFile.ImageFile):
         # HEAD
         s = self.fp.read(128)
         magic = i16(s[4:6])
-        if not (magic in [0xAF11, 0xAF12] and
-                i16(s[14:16]) in [0, 3] and  # flags
-                s[20:22] == b"\x00\x00"):  # reserved
+        if (
+            magic not in [0xAF11, 0xAF12]
+            or i16(s[14:16]) not in [0, 3]
+            or s[20:22] != b"\x00\x00"
+        ):  # reserved
             raise SyntaxError("not an FLI/FLC file")
 
         # frames
@@ -71,7 +73,7 @@ class FliImageFile(ImageFile.ImageFile):
 
         if i16(s[4:6]) == 0xF100:
             # prefix chunk; ignore it
-            self.__offset = self.__offset + i32(s)
+            self.__offset += i32(s)
             s = self.fp.read(16)
 
         if i16(s[4:6]) == 0xF1FA:
@@ -95,7 +97,7 @@ class FliImageFile(ImageFile.ImageFile):
         # load palette
 
         i = 0
-        for e in range(i16(self.fp.read(2))):
+        for _ in range(i16(self.fp.read(2))):
             s = self.fp.read(2)
             i = i + i8(s[0])
             n = i8(s[1])

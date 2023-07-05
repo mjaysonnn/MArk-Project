@@ -249,27 +249,21 @@ _MODEINFO = {
 
 }
 
-if sys.byteorder == 'little':
-    _ENDIAN = '<'
-else:
-    _ENDIAN = '>'
-
+_ENDIAN = '<' if sys.byteorder == 'little' else '>'
 _MODE_CONV = {
-    # official modes
-    "1": ('|b1', None),  # Bits need to be extended to bytes
+    "1": ('|b1', None),
     "L": ('|u1', None),
     "LA": ('|u1', 2),
-    "I": (_ENDIAN + 'i4', None),
-    "F": (_ENDIAN + 'f4', None),
+    "I": (f'{_ENDIAN}i4', None),
+    "F": (f'{_ENDIAN}f4', None),
     "P": ('|u1', None),
     "RGB": ('|u1', 3),
     "RGBX": ('|u1', 4),
     "RGBA": ('|u1', 4),
     "CMYK": ('|u1', 4),
     "YCbCr": ('|u1', 3),
-    "LAB": ('|u1', 3),  # UNDONE - unsigned |u1i1i1
+    "LAB": ('|u1', 3),
     "HSV": ('|u1', 3),
-    # I;16 == I;16L, and I;32 == I;32L
     "I;16": ('<u2', None),
     "I;16B": ('>u2', None),
     "I;16L": ('<u2', None),
@@ -405,7 +399,7 @@ def init():
     for plugin in _plugins:
         try:
             logger.debug("Importing %s", plugin)
-            __import__("PIL.%s" % plugin, globals(), locals(), [])
+            __import__(f"PIL.{plugin}", globals(), locals(), [])
         except ImportError as e:
             logger.debug("Image: failed to import %s: %s", plugin, e)
 
@@ -432,11 +426,11 @@ def _getdecoder(mode, decoder_name, args, extra=()):
         pass
     try:
         # get decoder
-        decoder = getattr(core, decoder_name + "_decoder")
+        decoder = getattr(core, f"{decoder_name}_decoder")
         # print(decoder, mode, args + extra)
         return decoder(mode, *args + extra)
     except AttributeError:
-        raise IOError("decoder %s not available" % decoder_name)
+        raise IOError(f"decoder {decoder_name} not available")
 
 
 def _getencoder(mode, encoder_name, args, extra=()):
@@ -454,11 +448,11 @@ def _getencoder(mode, encoder_name, args, extra=()):
         pass
     try:
         # get encoder
-        encoder = getattr(core, encoder_name + "_encoder")
+        encoder = getattr(core, f"{encoder_name}_encoder")
         # print(encoder, mode, args + extra)
         return encoder(mode, *args + extra)
     except AttributeError:
-        raise IOError("encoder %s not available" % encoder_name)
+        raise IOError(f"encoder {encoder_name} not available")
 
 
 # --------------------------------------------------------------------
@@ -606,10 +600,7 @@ class Image(object):
     def _dump(self, file=None, format=None, **options):
         import tempfile
 
-        suffix = ''
-        if format:
-            suffix = '.'+format
-
+        suffix = f'.{format}' if format else ''
         if not file:
             f, filename = tempfile.mkstemp(suffix)
             os.close(f)
@@ -661,19 +652,15 @@ class Image(object):
 
     @property
     def __array_interface__(self):
-        # numpy array interface support
-        new = {}
         shape, typestr = _conv_type_shape(self)
-        new['shape'] = shape
-        new['typestr'] = typestr
-        new['version'] = 3
-        if self.mode == '1':
-            # Binary images need to be extended from bits to bytes
-            # See: https://github.com/python-pillow/Pillow/issues/350
-            new['data'] = self.tobytes('raw', 'L')
-        else:
-            new['data'] = self.tobytes()
-        return new
+        return {
+            'shape': shape,
+            'typestr': typestr,
+            'version': 3,
+            'data': self.tobytes('raw', 'L')
+            if self.mode == '1'
+            else self.tobytes(),
+        }
 
     def __getstate__(self):
         return [
@@ -880,10 +867,7 @@ class Image(object):
 
         if not mode and self.mode == "P":
             # determine default mode
-            if self.palette:
-                mode = self.palette.mode
-            else:
-                mode = "RGB"
+            mode = self.palette.mode if self.palette else "RGB"
         if not mode or (mode == self.mode and not matrix):
             return self.copy()
 
@@ -901,7 +885,7 @@ class Image(object):
         delete_trns = False
         # transparency handling
         if "transparency" in self.info and \
-                self.info['transparency'] is not None:
+                    self.info['transparency'] is not None:
             if self.mode in ('L', 'RGB') and mode == 'RGBA':
                 # Use transparent conversion to promote from transparent
                 # color to an alpha channel.
@@ -1020,11 +1004,7 @@ class Image(object):
         self.load()
 
         if method is None:
-            # defaults:
-            method = 0
-            if self.mode == 'RGBA':
-                method = 2
-
+            method = 2 if self.mode == 'RGBA' else 0
         if self.mode == 'RGBA' and method not in (2, 3):
             # Caller specified an invalid mode.
             raise ValueError(
@@ -1036,7 +1016,7 @@ class Image(object):
             palette.load()
             if palette.mode != "P":
                 raise ValueError("bad mode for palette image")
-            if self.mode != "RGB" and self.mode != "L":
+            if self.mode not in ["RGB", "L"]:
                 raise ValueError(
                     "only RGB or L mode images can be quantized to a palette"
                     )
@@ -1091,11 +1071,8 @@ class Image(object):
 
         x0, y0, x1, y1 = map(int, map(round, box))
 
-        if x1 < x0:
-            x1 = x0
-        if y1 < y0:
-            y1 = y0
-
+        x1 = max(x1, x0)
+        y1 = max(y1, y0)
         _decompression_bomb_check((x1, y1))
 
         return im.crop((x0, y0, x1, y1))
@@ -1148,9 +1125,10 @@ class Image(object):
         if self.im.bands == 1 or multiband:
             return self._new(filter.filter(self.im))
 
-        ims = []
-        for c in range(self.im.bands):
-            ims.append(self._new(filter.filter(self.im.getband(c))))
+        ims = [
+            self._new(filter.filter(self.im.getband(c)))
+            for c in range(self.im.bands)
+        ]
         return merge(self.mode, ims)
 
     def getbands(self):
@@ -1190,13 +1168,8 @@ class Image(object):
         self.load()
         if self.mode in ("1", "L", "P"):
             h = self.im.histogram()
-            out = []
-            for i in range(256):
-                if h[i]:
-                    out.append((h[i], i))
-            if len(out) > maxcolors:
-                return None
-            return out
+            out = [(h[i], i) for i in range(256) if h[i]]
+            return None if len(out) > maxcolors else out
         return self.im.getcolors(maxcolors)
 
     def getdata(self, band=None):
@@ -1218,9 +1191,7 @@ class Image(object):
         """
 
         self.load()
-        if band is not None:
-            return self.im.getband(band)
-        return self.im  # could be abused
+        return self.im.getband(band) if band is not None else self.im
 
     def getextrema(self):
         """
@@ -1234,9 +1205,7 @@ class Image(object):
 
         self.load()
         if self.im.bands > 1:
-            extrema = []
-            for i in range(self.im.bands):
-                extrema.append(self.im.getband(i).getextrema())
+            extrema = [self.im.getband(i).getextrema() for i in range(self.im.bands)]
             return tuple(extrema)
         return self.im.getextrema()
 
@@ -1277,9 +1246,7 @@ class Image(object):
         """
 
         self.load()
-        if self.pyaccess:
-            return self.pyaccess.getpixel(xy)
-        return self.im.getpixel(xy)
+        return self.pyaccess.getpixel(xy) if self.pyaccess else self.im.getpixel(xy)
 
     def getprojection(self):
         """
@@ -1425,9 +1392,9 @@ class Image(object):
             raise ValueError("Source must be a tuple")
         if not isinstance(dest, (list, tuple)):
             raise ValueError("Destination must be a tuple")
-        if not len(source) in (2, 4):
+        if len(source) not in {2, 4}:
             raise ValueError("Source must be a 2 or 4-tuple")
-        if not len(dest) == 2:
+        if len(dest) != 2:
             raise ValueError("Destination must be a 2-tuple")
         if min(source) < 0:
             raise ValueError("Source must be non-negative")
@@ -1438,20 +1405,12 @@ class Image(object):
             source = source + im.size
 
         # over image, crop if it's not the whole thing.
-        if source == (0, 0) + im.size:
-            overlay = im
-        else:
-            overlay = im.crop(source)
-
+        overlay = im if source == (0, 0) + im.size else im.crop(source)
         # target for the paste
         box = dest + (dest[0] + overlay.width, dest[1] + overlay.height)
 
         # destination image. don't copy if we're using the whole image.
-        if box == (0, 0) + self.size:
-            background = self
-        else:
-            background = self.crop(box)
-
+        background = self if box == (0, 0) + self.size else self.crop(box)
         result = alpha_composite(background, overlay)
         self.paste(result, box)
 
@@ -1510,7 +1469,7 @@ class Image(object):
         if self.mode not in ("LA", "RGBA"):
             # attempt to promote self to a matching alpha mode
             try:
-                mode = getmodebase(self.mode) + "A"
+                mode = f"{getmodebase(self.mode)}A"
                 try:
                     self.im.setmode(mode)
                 except (AttributeError, ValueError):
@@ -1524,11 +1483,7 @@ class Image(object):
             except (KeyError, ValueError):
                 raise ValueError("illegal image mode")
 
-        if self.mode == "LA":
-            band = 1
-        else:
-            band = 3
-
+        band = 1 if self.mode == "LA" else 3
         if isImageType(alpha):
             # alpha layer
             if alpha.mode not in ("1", "L"):
@@ -1586,10 +1541,7 @@ class Image(object):
             palette = ImagePalette.raw(data.rawmode, data.palette)
         else:
             if not isinstance(data, bytes):
-                if bytes is str:
-                    data = "".join(chr(x) for x in data)
-                else:
-                    data = bytes(data)
+                data = "".join(chr(x) for x in data) if bytes is str else bytes(data)
             palette = ImagePalette.raw(rawmode, data)
         self.mode = "P"
         self.palette = palette
@@ -1727,11 +1679,7 @@ class Image(object):
 
         size = tuple(size)
 
-        if box is None:
-            box = (0, 0) + self.size
-        else:
-            box = tuple(box)
-
+        box = (0, 0) + self.size if box is None else tuple(box)
         if self.size == size and box == (0, 0) + self.size:
             return self.copy()
 
@@ -1808,15 +1756,8 @@ class Image(object):
 
         w, h = self.size
 
-        if translate is None:
-            post_trans = (0, 0)
-        else:
-            post_trans = translate
-        if center is None:
-            rotn_center = (w / 2.0, h / 2.0)  # FIXME These should be rounded to ints?
-        else:
-            rotn_center = center
-
+        post_trans = (0, 0) if translate is None else translate
+        rotn_center = (w / 2.0, h / 2.0) if center is None else center
         angle = - math.radians(angle)
         matrix = [
             round(math.cos(angle), 15), round(math.sin(angle), 15), 0.0,
@@ -1898,9 +1839,7 @@ class Image(object):
         # may mutate self!
         self.load()
 
-        save_all = False
-        if 'save_all' in params:
-            save_all = params.pop('save_all')
+        save_all = params.pop('save_all') if 'save_all' in params else False
         self.encoderinfo = params
         self.encoderconfig = ()
 
@@ -1914,15 +1853,11 @@ class Image(object):
             try:
                 format = EXTENSION[ext]
             except KeyError:
-                raise ValueError('unknown file extension: {}'.format(ext))
+                raise ValueError(f'unknown file extension: {ext}')
 
         if format.upper() not in SAVE:
             init()
-        if save_all:
-            save_handler = SAVE_ALL[format.upper()]
-        else:
-            save_handler = SAVE[format.upper()]
-
+        save_handler = SAVE_ALL[format.upper()] if save_all else SAVE[format.upper()]
         if open_fp:
             if params.get('append', False):
                 fp = builtins.open(filename, "r+b")
@@ -1996,10 +1931,7 @@ class Image(object):
         """
 
         self.load()
-        if self.im.bands == 1:
-            ims = [self.copy()]
-        else:
-            ims = map(self._new, self.im.split())
+        ims = [self.copy()] if self.im.bands == 1 else map(self._new, self.im.split())
         return tuple(ims)
 
     def getchannel(self, channel):
@@ -2019,8 +1951,7 @@ class Image(object):
             try:
                 channel = self.getbands().index(channel)
             except ValueError:
-                raise ValueError(
-                    'The image has no channel "{}"'.format(channel))
+                raise ValueError(f'The image has no channel "{channel}"')
 
         return self._new(self.im.getband(channel))
 
@@ -2144,7 +2075,7 @@ class Image(object):
         h = box[3] - box[1]
 
         if method == AFFINE:
-            data = data[0:6]
+            data = data[:6]
 
         elif method == EXTENT:
             # convert extent to an affine transform
@@ -2155,12 +2086,12 @@ class Image(object):
             data = (xs, 0, x0, 0, ys, y0)
 
         elif method == PERSPECTIVE:
-            data = data[0:8]
+            data = data[:8]
 
         elif method == QUAD:
             # quadrilateral warp.  data specifies the four corners
             # given as NW, SW, SE, and NE.
-            nw = data[0:2]
+            nw = data[:2]
             sw = data[2:4]
             se = data[4:6]
             ne = data[6:8]
@@ -2442,11 +2373,7 @@ def fromarray(obj, mode=None):
 
     size = shape[1], shape[0]
     if strides is not None:
-        if hasattr(obj, 'tobytes'):
-            obj = obj.tobytes()
-        else:
-            obj = obj.tostring()
-
+        obj = obj.tobytes() if hasattr(obj, 'tobytes') else obj.tostring()
     return frombuffer(mode, size, obj, "raw", rawmode, 0, 1)
 
 
@@ -2490,8 +2417,8 @@ _fromarray_typemap = {
     }
 
 # shortcuts
-_fromarray_typemap[((1, 1), _ENDIAN + "i4")] = ("I", "I")
-_fromarray_typemap[((1, 1), _ENDIAN + "f4")] = ("F", "F")
+_fromarray_typemap[(1, 1), f"{_ENDIAN}i4"] = ("I", "I")
+_fromarray_typemap[(1, 1), f"{_ENDIAN}f4"] = ("F", "F")
 
 
 def _decompression_bomb_check(size):

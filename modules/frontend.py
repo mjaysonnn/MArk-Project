@@ -27,35 +27,34 @@ sch = scheduler.Scheduler() # a general purpose event scheduler
 
 @app.route('/predict/<model_name>',  methods=['POST']) #decorator
 async def predict(request, model_name):
-    if request.method == 'POST':
-        receive_time = utils.now()
-        logging.info(f'Received request for model: {model_name}')
+    if request.method != 'POST':
+        return
+    receive_time = utils.now()
+    logging.info(f'Received request for model: {model_name}')
 
-        typ = request.json['type']
-        # use a general decoder to handle different types
-        # data =  utils.decode_image(request.json['data']) if typ == 'image' else request.json['data']
-        data = request.json['data']
+    typ = request.json['type']
+    # use a general decoder to handle different types
+    # data =  utils.decode_image(request.json['data']) if typ == 'image' else request.json['data']
+    data = request.json['data']
 
-        sch.record_request(model_name)
-        res, typ, handel_time = await processor.send_query(model_name, receive_time, data)
+    sch.record_request(model_name)
+    res, typ, handel_time = await processor.send_query(model_name, receive_time, data)
 
-        if (typ > 3):
-            scheduler.Scheduler.failed_rate = scheduler.Scheduler.failed_rate * 0.999 + 0.001
-        elif (handel_time > UPPER_LATENCY_BOUND):
-            scheduler.Scheduler.failed_rate = scheduler.Scheduler.failed_rate * 0.999 +  0.001
-        else:
-            scheduler.Scheduler.failed_rate = scheduler.Scheduler.failed_rate * 0.999
-
-        if sch.failed_rate > SLA_BOUND:  ## SLA mentioned in proposal
-            sch.launch_standby('c5.xlarge', 1, model_name)
-            scheduler.Scheduler.failed_rate = 0.0
+    scheduler.Scheduler.failed_rate = (
+        scheduler.Scheduler.failed_rate * 0.999 + 0.001
+        if (typ > 3) or (handel_time > UPPER_LATENCY_BOUND)
+        else scheduler.Scheduler.failed_rate * 0.999
+    )
+    if sch.failed_rate > SLA_BOUND:  ## SLA mentioned in proposal
+        sch.launch_standby('c5.xlarge', 1, model_name)
+        scheduler.Scheduler.failed_rate = 0.0
 
 
-        logging.info(f'Model: {model_name}; typ: {typ}; handel_time: {handel_time}; failed_rate: {scheduler.Scheduler.failed_rate}')
-        return json({
-            'res' : res,
-            'latency' : handel_time
-        })
+    logging.info(f'Model: {model_name}; typ: {typ}; handel_time: {handel_time}; failed_rate: {scheduler.Scheduler.failed_rate}')
+    return json({
+        'res' : res,
+        'latency' : handel_time
+    })
 
 @app.listener('after_server_start')
 async def notify_server_started(app, loop):

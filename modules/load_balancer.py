@@ -28,9 +28,9 @@ class WeightedBalancer(_Balancer):
     def next_ip(self, name, instance_list):
         if len(instance_list) <= 0:
             return
-        
+
         weight_list = [ (i.ip, Instance_Weights[i.typ], i.typ) for i in instance_list ]
-        max_weight = max([ i[1] for i in weight_list ])
+        max_weight = max(i[1] for i in weight_list)
         gcd_weight = utils.gcd([ i[1] for i in weight_list ])
 
         index, current_weight = self.indexes[name] if name in self.indexes else (-1, max_weight)
@@ -44,7 +44,7 @@ class WeightedBalancer(_Balancer):
             if next_ip_index < 0:
                 current_weight = current_weight - gcd_weight if current_weight > 0 else max_weight
                 index = -1
-        
+
         self.indexes[name] = (next_ip_index, current_weight)
         return (weight_list[next_ip_index][0], weight_list[next_ip_index][2])
 

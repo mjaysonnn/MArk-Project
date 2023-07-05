@@ -169,11 +169,10 @@ def _save_all(im, fp, filename):
     encoderinfo = im.encoderinfo.copy()
     append_images = list(encoderinfo.get("append_images", []))
 
-    # If total frame count is 1, then save using the legacy API, which
-    # will preserve non-alpha modes
-    total = 0
-    for ims in [im]+append_images:
-        total += 1 if not hasattr(ims, "n_frames") else ims.n_frames
+    total = sum(
+        1 if not hasattr(ims, "n_frames") else ims.n_frames
+        for ims in [im] + append_images
+    )
     if total == 1:
         _save(im, fp, filename)
         return
@@ -204,8 +203,9 @@ def _save_all(im, fp, filename):
     # Validate background color
     if (not isinstance(background, (list, tuple)) or len(background) != 4 or
             not all(v >= 0 and v < 256 for v in background)):
-        raise IOError("Background color is not an RGBA tuple clamped "
-                      "to (0-255): %s" % str(background))
+        raise IOError(
+            f"Background color is not an RGBA tuple clamped to (0-255): {str(background)}"
+        )
 
     # Convert to packed uint
     bg_r, bg_g, bg_b, bg_a = background
@@ -229,11 +229,7 @@ def _save_all(im, fp, filename):
     try:
         for ims in [im]+append_images:
             # Get # of frames in this image
-            if not hasattr(ims, "n_frames"):
-                nfr = 1
-            else:
-                nfr = ims.n_frames
-
+            nfr = 1 if not hasattr(ims, "n_frames") else ims.n_frames
             for idx in range(nfr):
                 ims.seek(idx)
                 ims.load()

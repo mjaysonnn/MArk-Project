@@ -76,10 +76,7 @@ class ContainerIO(object):
             read until end of region.
         :returns: An 8-bit string.
         """
-        if n:
-            n = min(n, self.length - self.pos)
-        else:
-            n = self.length - self.pos
+        n = min(n, self.length - self.pos) if n else self.length - self.pos
         if not n:  # EOF
             return ""
         self.pos = self.pos + n
@@ -109,8 +106,8 @@ class ContainerIO(object):
         """
         l = []
         while True:
-            s = self.readline()
-            if not s:
+            if s := self.readline():
+                l.append(s)
+            else:
                 break
-            l.append(s)
         return l

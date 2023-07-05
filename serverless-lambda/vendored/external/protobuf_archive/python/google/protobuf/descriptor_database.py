@@ -63,7 +63,7 @@ class DescriptorDatabase(object):
       self._file_desc_protos_by_file[proto_name] = file_desc_proto
     elif self._file_desc_protos_by_file[proto_name] != file_desc_proto:
       raise DescriptorDatabaseConflictingDefinitionError(
-          '%s already added, but with different descriptor.' % proto_name)
+          f'{proto_name} already added, but with different descriptor.')
 
     # Add all the top-level descriptors to the index.
     package = file_desc_proto.package
@@ -134,10 +134,9 @@ def _ExtractSymbols(desc_proto, package):
   Yields:
     The fully qualified name found in the descriptor.
   """
-  message_name = package + '.' + desc_proto.name if package else desc_proto.name
+  message_name = f'{package}.{desc_proto.name}' if package else desc_proto.name
   yield message_name
   for nested_type in desc_proto.nested_type:
-    for symbol in _ExtractSymbols(nested_type, message_name):
-      yield symbol
+    yield from _ExtractSymbols(nested_type, message_name)
   for enum_type in desc_proto.enum_type:
     yield '.'.join((message_name, enum_type.name))

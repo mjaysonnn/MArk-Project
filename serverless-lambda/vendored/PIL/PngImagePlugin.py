@@ -115,7 +115,7 @@ class ChunkStream(object):
 
         if not is_cid(cid):
             if not ImageFile.LOAD_TRUNCATED_IMAGES:
-                raise SyntaxError("broken PNG file (chunk %s)" % repr(cid))
+                raise SyntaxError(f"broken PNG file (chunk {repr(cid)})")
 
         return cid, pos, length
 
@@ -300,8 +300,9 @@ class PngStream(ChunkStream):
     def check_text_memory(self, chunklen):
         self.text_memory += chunklen
         if self.text_memory > MAX_TEXT_MEMORY:
-            raise ValueError("Too much memory used in text chunks: %s>MAX_TEXT_MEMORY" %
-                             self.text_memory)
+            raise ValueError(
+                f"Too much memory used in text chunks: {self.text_memory}>MAX_TEXT_MEMORY"
+            )
 
     def chunk_iCCP(self, pos, length):
 
@@ -317,8 +318,7 @@ class PngStream(ChunkStream):
         logger.debug("Compression method %s", i8(s[i]))
         comp_method = i8(s[i])
         if comp_method != 0:
-            raise SyntaxError("Unknown compression method %s in iCCP chunk" %
-                              comp_method)
+            raise SyntaxError(f"Unknown compression method {comp_method} in iCCP chunk")
         try:
             icc_profile = _safe_zlib_decompress(s[i+2:])
         except ValueError:
@@ -419,11 +419,11 @@ class PngStream(ChunkStream):
         s = ImageFile._safe_read(self.fp, length)
         px, py = i32(s), i32(s[4:])
         unit = i8(s[8])
-        if unit == 1:  # meter
+        if unit == 0:
+            self.im_info["aspect"] = px, py
+        elif unit == 1:
             dpi = int(px * 0.0254 + 0.5), int(py * 0.0254 + 0.5)
             self.im_info["dpi"] = dpi
-        elif unit == 0:
-            self.im_info["aspect"] = px, py
         return s
 
     def chunk_tEXt(self, pos, length):
@@ -455,13 +455,9 @@ class PngStream(ChunkStream):
         except ValueError:
             k = s
             v = b""
-        if v:
-            comp_method = i8(v[0])
-        else:
-            comp_method = 0
+        comp_method = i8(v[0]) if v else 0
         if comp_method != 0:
-            raise SyntaxError("Unknown compression method %s in zTXt chunk" %
-                              comp_method)
+            raise SyntaxError(f"Unknown compression method {comp_method} in zTXt chunk")
         try:
             v = _safe_zlib_decompress(v[1:])
         except ValueError:
@@ -498,17 +494,16 @@ class PngStream(ChunkStream):
         except ValueError:
             return s
         if cf != 0:
-            if cm == 0:
-                try:
-                    v = _safe_zlib_decompress(v)
-                except ValueError:
-                    if ImageFile.LOAD_TRUNCATED_IMAGES:
-                        return s
-                    else:
-                        raise
-                except zlib.error:
+            if cm != 0:
+                return s
+            try:
+                v = _safe_zlib_decompress(v)
+            except ValueError:
+                if ImageFile.LOAD_TRUNCATED_IMAGES:
                     return s
-            else:
+                else:
+                    raise
+            except zlib.error:
                 return s
         if bytes is not str:
             try:
@@ -625,11 +620,7 @@ class PngImageFile(ImageFile.ImageFile):
             self.__idat = length  # empty chunks are allowed
 
         # read more data from this chunk
-        if read_bytes <= 0:
-            read_bytes = self.__idat
-        else:
-            read_bytes = min(read_bytes, self.__idat)
-
+        read_bytes = self.__idat if read_bytes <= 0 else min(read_bytes, self.__idat)
         self.__idat = self.__idat - read_bytes
 
         return self.fp.read(read_bytes)
@@ -696,12 +687,10 @@ def _save(im, fp, filename, chunk=putchunk):
         if "bits" in im.encoderinfo:
             # number of bits specified by user
             colors = 1 << im.encoderinfo["bits"]
+        elif im.palette:
+            colors = max(min(len(im.palette.getdata()[1])//3, 256), 2)
         else:
-            # check palette contents
-            if im.palette:
-                colors = max(min(len(im.palette.getdata()[1])//3, 256), 2)
-            else:
-                colors = 256
+            colors = 256
 
         if colors <= 2:
             bits = 1
@@ -724,7 +713,7 @@ def _save(im, fp, filename, chunk=putchunk):
     try:
         rawmode, mode = _OUTMODES[mode]
     except KeyError:
-        raise IOError("cannot write mode %s as PNG" % mode)
+        raise IOError(f"cannot write mode {mode} as PNG")
 
     #
     # write minimal PNG file
@@ -740,8 +729,7 @@ def _save(im, fp, filename, chunk=putchunk):
 
     chunks = [b"cHRM", b"gAMA", b"sBIT", b"sRGB", b"tIME"]
 
-    icc = im.encoderinfo.get("icc_profile", im.info.get("icc_profile"))
-    if icc:
+    if icc := im.encoderinfo.get("icc_profile", im.info.get("icc_profile")):
         # ICC profile
         # according to PNG spec, the iCCP chunk contains:
         # Profile name  1-79 bytes (character string)
@@ -756,8 +744,7 @@ def _save(im, fp, filename, chunk=putchunk):
         # Disallow sRGB chunks when an iCCP-chunk has been emitted.
         chunks.remove(b"sRGB")
 
-    info = im.encoderinfo.get("pnginfo")
-    if info:
+    if info := im.encoderinfo.get("pnginfo"):
         chunks_multiple_allowed = [b"sPLT", b"iTXt", b"tEXt", b"zTXt"]
         for cid, data in info.chunks:
             if cid in chunks:
@@ -792,26 +779,22 @@ def _save(im, fp, filename, chunk=putchunk):
         elif im.mode == "RGB":
             red, green, blue = transparency
             chunk(fp, b"tRNS", o16(red) + o16(green) + o16(blue))
-        else:
-            if "transparency" in im.encoderinfo:
-                # don't bother with transparency if it's an RGBA
-                # and it's in the info dict. It's probably just stale.
-                raise IOError("cannot use transparency for this mode")
-    else:
-        if im.mode == "P" and im.im.getpalettemode() == "RGBA":
-            alpha = im.im.getpalette("RGBA", "A")
-            alpha_bytes = 2**bits
-            chunk(fp, b"tRNS", alpha[:alpha_bytes])
+        elif "transparency" in im.encoderinfo:
+            # don't bother with transparency if it's an RGBA
+            # and it's in the info dict. It's probably just stale.
+            raise IOError("cannot use transparency for this mode")
+    elif im.mode == "P" and im.im.getpalettemode() == "RGBA":
+        alpha = im.im.getpalette("RGBA", "A")
+        alpha_bytes = 2**bits
+        chunk(fp, b"tRNS", alpha[:alpha_bytes])
 
-    dpi = im.encoderinfo.get("dpi")
-    if dpi:
+    if dpi := im.encoderinfo.get("dpi"):
         chunk(fp, b"pHYs",
               o32(int(dpi[0] / 0.0254 + 0.5)),
               o32(int(dpi[1] / 0.0254 + 0.5)),
               b'\x01')
 
-    info = im.encoderinfo.get("pnginfo")
-    if info:
+    if info := im.encoderinfo.get("pnginfo"):
         chunks = [b"bKGD", b"hIST"]
         for cid, data in info.chunks:
             if cid in chunks:

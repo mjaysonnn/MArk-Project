@@ -276,10 +276,10 @@ class ProcessPoolExecutor(_base.Executor):
 
         if max_workers is None:
             self._max_workers = multiprocessing.cpu_count()
-        else:
-            if max_workers <= 0:
-                raise ValueError("max_workers must be greater than 0")
+        elif max_workers <= 0:
+            raise ValueError("max_workers must be greater than 0")
 
+        else:
             self._max_workers = max_workers
 
         # Make the call queue slightly larger than the number of processes to

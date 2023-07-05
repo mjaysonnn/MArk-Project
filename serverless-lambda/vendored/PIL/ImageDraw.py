@@ -67,10 +67,7 @@ class ImageDraw(object):
                 blend = 1
             else:
                 raise ValueError("mode mismatch")
-        if mode == "P":
-            self.palette = im.palette
-        else:
-            self.palette = None
+        self.palette = im.palette if mode == "P" else None
         self.im = im.im
         self.draw = Image.core.draw(self.im, blend)
         self.mode = mode
@@ -78,11 +75,7 @@ class ImageDraw(object):
             self.ink = self.draw.draw_ink(1, mode)
         else:
             self.ink = self.draw.draw_ink(-1, mode)
-        if mode in ("1", "P", "I", "F"):
-            # FIXME: fix Fill2 to properly support matte for I+F images
-            self.fontmode = "1"
-        else:
-            self.fontmode = "L"  # aliasing is okay for other modes
+        self.fontmode = "1" if mode in ("1", "P", "I", "F") else "L"
         self.fill = 0
         self.font = None
 
@@ -373,7 +366,7 @@ def floodfill(image, xy, value, border=None, thresh=0):
                     except IndexError:
                         pass
                     else:
-                        if p != value and p != border:
+                        if p not in [value, border]:
                             pixel[s, t] = value
                             newedge.append((s, t))
             edge = newedge

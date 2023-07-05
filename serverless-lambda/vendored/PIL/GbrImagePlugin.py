@@ -46,7 +46,7 @@ class GbrImageFile(ImageFile.ImageFile):
         if header_size < 20:
             raise SyntaxError("not a GIMP brush")
         if version not in (1, 2):
-            raise SyntaxError("Unsupported GIMP brush version: %s" % version)
+            raise SyntaxError(f"Unsupported GIMP brush version: {version}")
 
         width = i32(self.fp.read(4))
         height = i32(self.fp.read(4))
@@ -54,7 +54,7 @@ class GbrImageFile(ImageFile.ImageFile):
         if width <= 0 or height <= 0:
             raise SyntaxError("not a GIMP brush")
         if color_depth not in (1, 4):
-            raise SyntaxError("Unsupported GIMP brush color depth: %s" % color_depth)
+            raise SyntaxError(f"Unsupported GIMP brush color depth: {color_depth}")
 
         if version == 1:
             comment_length = header_size-20
@@ -67,11 +67,7 @@ class GbrImageFile(ImageFile.ImageFile):
 
         comment = self.fp.read(comment_length)[:-1]
 
-        if color_depth == 1:
-            self.mode = "L"
-        else:
-            self.mode = 'RGBA'
-
+        self.mode = "L" if color_depth == 1 else 'RGBA'
         self.size = width, height
 
         self.info["comment"] = comment
